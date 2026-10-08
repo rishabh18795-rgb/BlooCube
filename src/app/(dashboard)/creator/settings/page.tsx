@@ -841,13 +841,6 @@ function SettingsPageContent() {
       )}
 
       <div className="bg-white/80  rounded-sm hover:shadow-sm border border-gray-200/04">
-        <div className="p-4 border-b border-gray-200">
-          <h1 className=" md:block text-2xl font-semibold text-gray-900">Settings</h1>
-          <p className=" md:block text-gray-600 mt-1">
-            Manage your account preferences and integrations
-          </p>
-        </div>
-
         <div className="p-4 md:p-6 space-y-6 md:space-y-8">
           {/* Profile Information */}
           <section>

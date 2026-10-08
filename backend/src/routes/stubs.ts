@@ -44,4 +44,14 @@ router.get('/admin/ai-providers/usage-stats', requireAuth, (req, res) => ok(res,
 router.post('/admin/ai-providers/switch', requireAuth, (req, res) => fail(res, 'No AI providers configured', 501, 'NOT_CONFIGURED'));
 router.post('/admin/ai-providers/test', requireAuth, (req, res) => fail(res, 'No AI providers configured', 501, 'NOT_CONFIGURED'));
 
+// Social platform OAuth (Instagram/Facebook/Twitter/LinkedIn/YouTube) is not
+// configured. "Not connected" is an honest, real state here — these were
+// 404ing instead (no route at all), which the Settings page's "Linked
+// Accounts" section degrades gracefully on, but it spammed the console on
+// every load. success:true + connected:false matches what these clients
+// (src/lib/instagram.ts etc.) already expect from a real backend.
+for (const platform of ['instagram', 'facebook', 'twitter', 'linkedin', 'youtube']) {
+  router.get(`/${platform}/status`, requireAuth, (req, res) => ok(res, { connected: false }));
+}
+
 export default router;
