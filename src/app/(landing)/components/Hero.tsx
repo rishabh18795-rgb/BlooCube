@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Instagram, Youtube, Music2, Wallet2, FileCheck2, MapPin } from "lucide-react";
 import { Button } from "@/Components/ui/Button";
 import CreatorAvatar from "@/Components/CreatorAvatar";
+import MarketplaceIllustration from "@/Components/MarketplaceIllustration";
 
 const SHOWCASE = [
   { name: "Ananya Kapoor", niche: "Beauty", city: "Delhi", followers: "128K", engagement: "4.8%", icon: Instagram },
@@ -69,6 +70,7 @@ export default function Hero() {
         </div>
 
         <div className="relative">
+          <MarketplaceIllustration className="hidden lg:block absolute -top-16 -right-20 w-[420px] h-[420px] opacity-[0.07] pointer-events-none" />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {SHOWCASE.map((c, i) => {
               const Icon = c.icon;

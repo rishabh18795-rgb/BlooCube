@@ -35,6 +35,23 @@ export type Campaign = {
   brand_id?: { _id: string; name?: string; email?: string } | string;
   createdAt?: string;
   updatedAt?: string;
+  applicationsCount?: number;
+  creatorRequirements?: {
+    platforms: string[];
+    categories: string[];
+    locationScope: 'any' | 'national' | 'specific_cities';
+    specificCities: string[];
+    creatorSize: string;
+    minEngagementRate: number;
+  };
+  budgetBidding?: {
+    biddingType: 'OPEN' | 'FIXED' | string;
+    budgetMin: number;
+    budgetMax: number;
+    creatorsRequired: number;
+    applicationDeadline: string;
+    startDate: string;
+  };
 };
 
 export type CampaignListResponse = {

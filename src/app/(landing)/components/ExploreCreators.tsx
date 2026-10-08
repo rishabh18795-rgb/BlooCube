@@ -6,6 +6,7 @@ import { Search, Sparkles, Palette, Dumbbell, Utensils, Plane, Laptop2, Shirt } 
 import { apiRequest } from "@/lib/apiClient";
 import CreatorAvatar from "@/Components/CreatorAvatar";
 import { Badge } from "@/Components/ui/Badge";
+import MarketplaceIllustration from "@/Components/MarketplaceIllustration";
 
 type CreatorCard = {
   _id: string;
@@ -57,7 +58,8 @@ export default function ExploreCreators() {
   }, []);
 
   return (
-    <section id="find-creators" className="py-16 sm:py-20 bg-white">
+    <section id="find-creators" className="relative py-16 sm:py-20 bg-white overflow-hidden">
+      <MarketplaceIllustration className="hidden lg:block absolute top-4 right-0 w-64 h-64 opacity-[0.06] pointer-events-none" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
           <div>

@@ -8,12 +8,16 @@ const PUBLIC_ROUTES = [
   "/campaigns",
   "/how-it-works",
   "/pricing",
+  "/about",
   "/resources",
   "/contact",
   "/login",
   "/signup",
   "/terms",
   "/privacy",
+  "/cookie-policy",
+  "/cancellation-refund",
+  "/shipping-delivery",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
