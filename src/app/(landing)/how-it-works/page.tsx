@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import { FileText, Users, MessageSquare, CreditCard, TrendingUp, CheckCircle2 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "How It Works",
+  description: "See how BlooCube connects brands and creators — from campaign brief, to bids, to secure escrow payment.",
+  alternates: { canonical: "/how-it-works" },
+  openGraph: { title: "How It Works | BlooCube", description: "From campaign brief to secure escrow payment — how BlooCube works.", url: "/how-it-works" },
+};
 
 const STEPS = [
   { icon: FileText, title: "Create a Campaign", desc: "Brands define their goals, budget, deliverables and target creator profile in a guided 5-step brief." },

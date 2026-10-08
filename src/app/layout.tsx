@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PerformanceDebugger } from "@/Components/PerformanceDebugger";
 import RouteProgress from "@/Components/ui/RouteProgress";
@@ -7,28 +8,36 @@ import Link from "next/link";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3090";
 
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "BlooCube — Brands Post. Creators Apply. Deals Happen.",
+    default: "BlooCube — Influencer Marketing Marketplace for Brands & Creators",
     template: "%s | BlooCube",
   },
   description:
-    "BlooCube is a creator-brand collaboration marketplace: brands post campaigns, creators apply with their own bid, and payment is held in escrow until the work is approved.",
+    "Discover verified creators, launch influencer campaigns, compare bids and manage collaborations with secure payments on BlooCube.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "BlooCube — Brands Post. Creators Apply. Deals Happen.",
+    title: "BlooCube — Influencer Marketing Marketplace for Brands & Creators",
     description:
-      "Discover creators, receive bids, manage collaborations and secure payments — all in one place.",
+      "Discover verified creators, launch influencer campaigns, compare bids and manage collaborations with secure payments on BlooCube.",
     url: siteUrl,
     siteName: "BlooCube",
     type: "website",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "BlooCube — Influencer Marketing Marketplace" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BlooCube — Brands Post. Creators Apply. Deals Happen.",
+    title: "BlooCube — Influencer Marketing Marketplace for Brands & Creators",
     description:
-      "Discover creators, receive bids, manage collaborations and secure payments — all in one place.",
+      "Discover verified creators, launch influencer campaigns, compare bids and manage collaborations with secure payments on BlooCube.",
+    images: ["/opengraph-image"],
   },
 };
 
@@ -38,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={plusJakarta.variable}>
       <body>
         {/* Google Analytics - Always load in production */}
         <GoogleAnalytics />

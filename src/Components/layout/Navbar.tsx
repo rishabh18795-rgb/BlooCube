@@ -12,6 +12,8 @@ const navItems = [
   { href: "/find-creators", label: "Find Creators" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/how-it-works", label: "How It Works" },
+  { href: "/#for-brands", label: "For Brands" },
+  { href: "/#for-creators", label: "For Creators" },
   { href: "/pricing", label: "Pricing" },
 ];
 
@@ -29,19 +31,19 @@ const Navbar = () => {
             <span className="text-lg font-bold text-slate-900">BlooCube</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-6">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+                className="text-sm font-medium text-slate-600 hover:text-brand-indigo transition-colors"
               >
                 {item.label}
               </Link>
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {isAuthenticated ? (
               <Link href={dashboardHref}>
                 <Button className="h-9 px-5 bg-slate-900 hover:bg-slate-800 rounded-lg text-white text-sm font-semibold">
@@ -65,7 +67,7 @@ const Navbar = () => {
           </div>
 
           <button
-            className="md:hidden p-2 text-slate-700"
+            className="lg:hidden p-2 text-slate-700"
             onClick={() => setOpen((v) => !v)}
             aria-label="Toggle menu"
             aria-expanded={open}
@@ -75,7 +77,7 @@ const Navbar = () => {
         </div>
 
         {open && (
-          <div className="md:hidden pb-4 flex flex-col gap-3">
+          <div className="lg:hidden pb-4 flex flex-col gap-3">
             {navItems.map((item) => (
               <Link
                 key={item.href}

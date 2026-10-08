@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Search, BadgeCheck } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Search } from "lucide-react";
 import { apiRequest } from "@/lib/apiClient";
+import CreatorAvatar from "@/Components/CreatorAvatar";
+import { Badge } from "@/Components/ui/Badge";
 
 type CreatorCard = {
   _id: string;
@@ -18,11 +21,14 @@ type CreatorCard = {
 
 const NICHES = ["All", "Fashion", "Beauty", "Lifestyle", "Tech", "Fitness", "Food", "Travel"];
 
-export default function FindCreatorsPage() {
+function FindCreatorsContent() {
+  const searchParams = useSearchParams();
+  const initialNiche = searchParams.get("niche") || "All";
+
   const [creators, setCreators] = useState<CreatorCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [niche, setNiche] = useState("All");
+  const [niche, setNiche] = useState(NICHES.includes(initialNiche) ? initialNiche : "All");
   const [minFollowers, setMinFollowers] = useState("");
 
   useEffect(() => {
@@ -53,8 +59,11 @@ export default function FindCreatorsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-      <h1 className="text-3xl font-bold text-slate-900">Find Creators</h1>
-      <p className="text-slate-600 mt-2">Browse verified creators by niche, platform, followers and location.</p>
+      <span className="inline-block text-xs font-semibold tracking-wide text-brand-indigo uppercase mb-2">
+        Creator Marketplace
+      </span>
+      <h1 className="text-3xl sm:text-4xl font-extrabold text-[#111827]">Find Creators</h1>
+      <p className="text-[#667085] mt-2">Browse verified creators by niche, platform, followers and location.</p>
 
       <div className="mt-6 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -63,7 +72,7 @@ export default function FindCreatorsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or niche..."
-            className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-indigo/20"
           />
         </div>
         <select value={niche} onChange={(e) => setNiche(e.target.value)} className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm">
@@ -86,28 +95,37 @@ export default function FindCreatorsPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <p className="mt-10 text-sm text-slate-500">No creators match your filters.</p>
+        <p className="mt-10 text-sm text-[#667085]">No creators match your filters.</p>
       ) : (
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {filtered.map((c) => (
-            <div key={c._id} className="rounded-xl border border-slate-100 shadow-sm bg-white overflow-hidden flex flex-col">
-              <div className="aspect-square bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white text-2xl font-bold">
-                {c.name.split(" ").map((p) => p[0]).join("")}
-              </div>
+            <div
+              key={c._id}
+              className="rounded-xl border border-slate-100 shadow-sm bg-white overflow-hidden flex flex-col transition-all hover:shadow-lg hover:shadow-slate-200/70 hover:-translate-y-1"
+            >
+              <CreatorAvatar name={c.name} className="aspect-square text-2xl rounded-none" />
               <div className="p-3 flex-1 flex flex-col">
-                <div className="flex items-center gap-1 text-sm font-semibold text-slate-900">
+                <div className="flex items-center gap-1 text-sm font-semibold text-[#111827]">
                   {c.name}
-                  {c.verified && <BadgeCheck className="w-3.5 h-3.5 text-indigo-500" />}
+                  {c.verified && <Badge className="px-1.5 py-0">✓</Badge>}
                 </div>
-                <div className="text-xs text-slate-500">{c.niches[0] || "Creator"} · {c.location || "India"}</div>
+                <div className="text-xs text-[#667085]">{c.niches[0] || "Creator"} · {c.location || "India"}</div>
                 <div className="mt-2 text-xs text-slate-700 font-medium">{(c.followers / 1000).toFixed(0)}K followers</div>
-                <div className="text-xs text-emerald-600 font-medium">{c.engagementRate}% engagement</div>
-                <div className="text-xs text-slate-500 mt-1">From ₹{c.startingPrice.toLocaleString("en-IN")}</div>
+                <div className="text-xs text-brand-success font-medium">{c.engagementRate}% engagement</div>
+                <div className="text-xs text-[#667085] mt-1">From ₹{c.startingPrice.toLocaleString("en-IN")}</div>
               </div>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+export default function FindCreatorsPage() {
+  return (
+    <Suspense fallback={<div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-sm text-[#667085]">Loading...</div>}>
+      <FindCreatorsContent />
+    </Suspense>
   );
 }
