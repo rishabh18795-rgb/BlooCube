@@ -83,6 +83,25 @@ const nextConfig: NextConfig = {
   // Compression
   compress: true,
 
+  // Proxy /api/* to the backend server-side. This makes every API call
+  // same-origin from the browser's point of view, so the backend's
+  // HttpOnly auth cookies land on *this* domain instead of the backend's —
+  // required because the frontend and backend are deployed to unrelated
+  // domains (Vercel/Railway) with no shared parent domain to scope a
+  // cross-site cookie to. BACKEND_API_URL is a server-only env var (not
+  // NEXT_PUBLIC_*) since it's only ever read during the rewrite, not by
+  // browser code.
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_API_URL;
+    if (!backendUrl) return [];
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl.replace(/\/+$/, '')}/api/:path*`,
+      },
+    ];
+  },
+
   // Headers for caching and security
   async headers() {
     return [
