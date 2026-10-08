@@ -1,7 +1,27 @@
+# Builds and deploys the BlooCube frontend (Next.js) to Cloud Run.
+#
+# Prefer Vercel for the frontend if you have (or can create) a Vercel
+# account — `vercel --prod` from the repo root is simpler than this
+# pipeline and doesn't require a GCP project. This file is here as the
+# alternative if you'd rather keep both frontend and backend on Cloud Run.
+#
+# Run from the repo root:
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_API_URL=https://your-backend-url.run.app \
+#     .
+#
+# NOTE: this file previously referenced a "Bloocube-frontend/" subfolder
+# that doesn't exist in this repo (the Next.js app IS the repo root) —
+# fixed below. It would have failed outright if triggered as-is.
+
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: 'E2_HIGHCPU_8'  # Optional: Faster builds
-  
+
+substitutions:
+  _API_URL: 'https://api-backend.Bloocube.com' # override once the backend is deployed
+  _REGION: 'asia-southeast1'
+
 steps:
   # Step 1: Build container image with NEXT_PUBLIC_API_URL baked in
   - name: gcr.io/cloud-builders/docker
@@ -9,14 +29,12 @@ steps:
     args:
       - build
       - '-f'
-      - 'Bloocube-frontend/Dockerfile'
+      - 'Dockerfile'
       - '-t'
       - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/Bloocube/Bloocube-frontend:latest'
       - '--build-arg'
-      - 'NEXT_PUBLIC_API_URL=https://api-backend.Bloocube.com'
-      - '--build-arg'
-      - 'NEXT_PUBLIC_AI_VIDEO_GEN_URL=https://ai-video.bloocube.com'
-      - 'Bloocube-frontend'
+      - 'NEXT_PUBLIC_API_URL=${_API_URL}'
+      - '.'
 
   # Step 2: Push image to Artifact Registry
   - name: gcr.io/cloud-builders/docker
@@ -36,7 +54,7 @@ steps:
       - deploy
       - 'Bloocube-frontend'
       - '--image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/Bloocube/Bloocube-frontend:latest'
-      - '--region=asia-southeast1'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=3000'
@@ -45,7 +63,7 @@ steps:
       - '--timeout=300'
       - '--max-instances=10'
       - '--min-instances=0'
-      - '--set-env-vars=NEXT_PUBLIC_API_URL=https://api-backend.Bloocube.com,NODE_ENV=production'
+      - '--set-env-vars=NEXT_PUBLIC_API_URL=${_API_URL},NODE_ENV=production'
 
 # Images to be pushed to registry
 images:

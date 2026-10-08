@@ -48,4 +48,5 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: ['/login', '/signup', '/admin/:path*', '/creator/:path*', '/brand/:path*'],
+  runtime: 'nodejs',
 };

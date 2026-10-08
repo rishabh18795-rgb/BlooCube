@@ -1,0 +1,64 @@
+# Builds and deploys the BlooCube backend (Express/Prisma) to Cloud Run.
+#
+# Run from the backend/ directory:
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_FRONTEND_ORIGIN=https://your-vercel-url.vercel.app \
+#     .
+#
+# JWT_ACCESS_SECRET / JWT_REFRESH_SECRET are intentionally NOT set here.
+# Generate real random values and store them in Secret Manager, then add
+# `--set-secrets=JWT_ACCESS_SECRET=jwt-access:latest,JWT_REFRESH_SECRET=jwt-refresh:latest`
+# to the `gcloud run deploy` step below (or set them once via the Cloud Run
+# console) rather than passing them as a build substitution, which would
+# make them visible in Cloud Build logs/history.
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+substitutions:
+  _FRONTEND_ORIGIN: 'http://localhost:3090' # override with your real frontend URL
+  _REGION: 'asia-southeast1'
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: 'build-image'
+    args:
+      - build
+      - '-f'
+      - 'Dockerfile'
+      - '-t'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/Bloocube/Bloocube-backend:latest'
+      - '.'
+
+  - name: gcr.io/cloud-builders/docker
+    id: 'push-image'
+    waitFor: ['build-image']
+    args:
+      - push
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/Bloocube/Bloocube-backend:latest'
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: 'deploy-service'
+    waitFor: ['push-image']
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - 'Bloocube-backend'
+      - '--image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/Bloocube/Bloocube-backend:latest'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--timeout=300'
+      - '--max-instances=1' # SQLite inside the container is single-instance only — see backend/Dockerfile
+      - '--min-instances=0'
+      - '--set-env-vars=NODE_ENV=production,FRONTEND_ORIGIN=${_FRONTEND_ORIGIN},ACCESS_TOKEN_TTL=15m,REFRESH_TOKEN_TTL=7d'
+
+images:
+  - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/Bloocube/Bloocube-backend:latest'
+
+timeout: '1800s'
