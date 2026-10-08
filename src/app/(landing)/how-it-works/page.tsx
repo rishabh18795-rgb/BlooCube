@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "How It Works",
   description: "See how BlooCube connects brands and creators — from campaign brief, to bids, to secure escrow payment.",
   alternates: { canonical: "/how-it-works" },
-  openGraph: { title: "How It Works | BlooCube", description: "From campaign brief to secure escrow payment — how BlooCube works.", url: "/how-it-works" },
+  openGraph: { title: "How It Works | BlooCube", description: "From campaign brief to secure escrow payment — how BlooCube works.", url: "/how-it-works", images: ["/opengraph-image"] },
 };
 
 const STEPS = [
