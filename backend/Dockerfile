@@ -42,7 +42,13 @@ COPY --from=builder --chown=express:nodejs /app/prisma ./prisma
 ENV DATABASE_URL="file:/app/data/prod.db"
 RUN mkdir -p /app/data && chown express:nodejs /app/data
 
-USER express
+# NOTE: no USER directive here. Railway (and similar platforms) mount a
+# persistent Volume at /app/data at container *start* time, which replaces
+# whatever ownership was set on that path at build time — the mounted
+# volume's own root ownership wins, not the image's baked-in chown. Since
+# that mount's owning UID isn't controllable from the Dockerfile, the
+# container runs as root so it can always create/open the SQLite file
+# there regardless of the volume's actual ownership.
 
 # Cloud Run injects PORT (defaults to 8080); the app reads it via process.env.PORT.
 EXPOSE 8080
@@ -50,5 +56,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||8080)+'/health', r=>{if(r.statusCode<200||r.statusCode>=500)process.exit(1)}).on('error',()=>process.exit(1))" || exit 1
 
-# Apply migrations (creating/updating the SQLite file) then start the server.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Ensure the mount point exists (a fresh volume may mount empty) before
+# migrating, then apply migrations and start the server.
+CMD ["sh", "-c", "mkdir -p /app/data && npx prisma migrate deploy && node dist/index.js"]
