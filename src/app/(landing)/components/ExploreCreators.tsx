@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Search, Sparkles, Palette, Dumbbell, Utensils, Plane, Laptop2, Shirt } from "lucide-react";
 import { apiRequest } from "@/lib/apiClient";
 import CreatorAvatar from "@/Components/CreatorAvatar";
-import { Badge } from "@/Components/ui/Badge";
 import MarketplaceIllustration from "@/Components/MarketplaceIllustration";
+import { getDemoCreatorPhoto } from "@/lib/creatorPhotos";
 
 type CreatorCard = {
   _id: string;
@@ -113,11 +113,16 @@ export default function ExploreCreators() {
                   key={c._id}
                   className="group rounded-xl border border-slate-100 shadow-sm bg-white overflow-hidden flex flex-col transition-all hover:shadow-lg hover:shadow-slate-200/70 hover:-translate-y-1"
                 >
-                  <CreatorAvatar name={c.name} className="aspect-square text-2xl rounded-none" />
+                  <CreatorAvatar
+                    name={c.name}
+                    photoUrl={getDemoCreatorPhoto(c.name)}
+                    verified={c.verified}
+                    className="aspect-square text-2xl rounded-none"
+                    sizes="200px"
+                  />
                   <div className="p-3 flex-1 flex flex-col">
                     <div className="flex items-center gap-1 text-sm font-semibold text-[#111827]">
                       {c.name}
-                      {c.verified && <Badge variant="default" className="px-1.5 py-0">✓</Badge>}
                     </div>
                     <div className="text-xs text-[#667085]">{c.niches[0] || "Creator"} · {c.location || "India"}</div>
                     <div className="mt-2 text-xs text-slate-700 font-medium">{formatFollowers(c.followers)} followers</div>

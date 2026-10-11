@@ -5,6 +5,7 @@ import { Instagram, Youtube, Music2, Wallet2, FileCheck2, MapPin } from "lucide-
 import { Button } from "@/Components/ui/Button";
 import CreatorAvatar from "@/Components/CreatorAvatar";
 import MarketplaceIllustration from "@/Components/MarketplaceIllustration";
+import { getDemoCreatorPhoto } from "@/lib/creatorPhotos";
 
 const SHOWCASE = [
   { name: "Ananya Kapoor", niche: "Beauty", city: "Delhi", followers: "128K", engagement: "4.8%", icon: Instagram },
@@ -79,7 +80,13 @@ export default function Hero() {
                   key={c.name}
                   className={`bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 p-4 transition-transform hover:-translate-y-1 sm:translate-y-0 ${i === 0 ? "sm:-translate-y-4" : i === 2 ? "sm:translate-y-4" : ""}`}
                 >
-                  <CreatorAvatar name={c.name} verified className="aspect-square text-2xl mb-3" />
+                  <CreatorAvatar
+                    name={c.name}
+                    photoUrl={getDemoCreatorPhoto(c.name)}
+                    verified
+                    className="aspect-square text-2xl mb-3"
+                    sizes="160px"
+                  />
                   <div className="flex items-center gap-1 text-sm font-semibold text-[#111827]">
                     {c.name}
                     <Icon className="w-3.5 h-3.5 text-brand-indigo" />
