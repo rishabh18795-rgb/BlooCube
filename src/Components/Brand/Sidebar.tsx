@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Briefcase, Home, Settings, Users, Store, BarChart3, User, LogOut, MessageSquare, Wallet } from 'lucide-react';
 import React, { useState } from 'react';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { cookieAuthUtils } from '@/lib/cookieAuth';
+import { performLogout } from '@/lib/auth';
 import { getAvatarUrl } from '@/lib/profile';
 import LogoutModal from '../Creater/LogoutModel';
 import { ChevronLeft,ChevronRight } from 'lucide-react';
@@ -48,15 +48,27 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen ,setSidebarOpen}) => {
   const { profile, loading: profileLoading, error: profileError } = useUserProfile();
 
   const [openLogoutModal, setOpenLogoutModal] = useState(false);
- 
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
     const handleOpenLogoutModal = () => {
+       setLogoutError(null);
        setOpenLogoutModal(true);
       };
-    
-     const onLogout = useCallback(() => {
-      cookieAuthUtils.clearAuth();
+
+     const onLogout = useCallback(async () => {
+      if (loggingOut) return;
+      setLoggingOut(true);
+      setLogoutError(null);
+      const result = await performLogout();
+      setLoggingOut(false);
+      if (!result.success) {
+        setLogoutError(result.error || 'Logout failed. Please try again.');
+        return;
+      }
+      setOpenLogoutModal(false);
       router.push('/login');
-    }, [router]);
+    }, [router, loggingOut]);
   
   return (
     <>
@@ -185,10 +197,12 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen ,setSidebarOpen}) => {
 </div>
     </aside>
      {openLogoutModal && (
-      <LogoutModal 
+      <LogoutModal
         open={openLogoutModal}
         onOpenChange={setOpenLogoutModal}
         onConfirm={onLogout}
+        loading={loggingOut}
+        error={logoutError}
       />
       )}
       </>

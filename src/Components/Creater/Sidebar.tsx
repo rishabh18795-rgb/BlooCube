@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { cookieAuthUtils } from '@/lib/cookieAuth';
+import { performLogout } from '@/lib/auth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { getAvatarUrl } from '@/lib/profile';
 import LogoutModal from './LogoutModel';
@@ -69,14 +70,26 @@ const Sidebar = React.memo(({ sidebarOpen,setSidebarOpen }: SidebarProps) => {
  
  const [openLogoutModal, setOpenLogoutModal] = useState(false);
  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+ const [loggingOut, setLoggingOut] = useState(false);
+ const [logoutError, setLogoutError] = useState<string | null>(null);
   const handleOpenLogoutModal = () => {
+     setLogoutError(null);
      setOpenLogoutModal(true);
     };
-  
-   const onLogout = useCallback(() => {
-    cookieAuthUtils.clearAuth();
+
+   const onLogout = useCallback(async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    const result = await performLogout();
+    setLoggingOut(false);
+    if (!result.success) {
+      setLogoutError(result.error || 'Logout failed. Please try again.');
+      return;
+    }
+    setOpenLogoutModal(false);
     router.push('/login');
-  }, [router]);
+  }, [router, loggingOut]);
 
     
   const getNavItemClasses = (item: typeof sidebarItems[0], isActive: boolean) => {
@@ -239,10 +252,12 @@ const Sidebar = React.memo(({ sidebarOpen,setSidebarOpen }: SidebarProps) => {
       </div>
     </aside>
     {openLogoutModal && (
-  <LogoutModal 
+  <LogoutModal
     open={openLogoutModal}
     onOpenChange={setOpenLogoutModal}
     onConfirm={onLogout}
+    loading={loggingOut}
+    error={logoutError}
   />
 )}
     </>

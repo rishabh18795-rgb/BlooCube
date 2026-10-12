@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Users, Briefcase, CreditCard, Wallet, Scale, Settings, LogOut, Shield, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { cookieAuthUtils } from "@/lib/cookieAuth";
-import { apiRequest } from "@/lib/apiClient";
+import { performLogout } from "@/lib/auth";
 
 const NAV = [
   { name: "Overview", href: "/admin", icon: Shield },
@@ -24,8 +23,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user } = useAuth();
 
   const logout = async () => {
-    await apiRequest("/api/auth/logout", { method: "POST" }).catch(() => {});
-    cookieAuthUtils.clearAuth();
+    const result = await performLogout();
+    if (!result.success) {
+      alert(result.error || "Logout failed. Please try again.");
+      return;
+    }
     router.push("/login");
   };
 

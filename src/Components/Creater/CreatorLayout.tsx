@@ -11,7 +11,7 @@ import {
 import Sidebar from "./Sidebar";
 import NotificationDropdown from "./NotificationDropdown";
 import { useRouter } from "next/navigation";
-import { cookieAuthUtils } from "@/lib/cookieAuth";
+import { performLogout } from "@/lib/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import HeaderRow from "@/Components/layout/HeaderRow";
@@ -153,22 +153,31 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const [openLogoutModal, setOpenLogoutModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const router = useRouter();
 
   const handleOpenLogoutModal = () => {
     setUserDropdownOpen(false);
+    setLogoutError(null);
     setOpenLogoutModal(true);
   };
 
-  const handleLogout = () => {
-    try {
-      cookieAuthUtils.clearAuth();
-    } finally {
-      setUserDropdownOpen(false);
-      router.push("/login");
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    const result = await performLogout();
+    setLoggingOut(false);
+    if (!result.success) {
+      setLogoutError(result.error || "Logout failed. Please try again.");
+      return;
     }
+    setOpenLogoutModal(false);
+    setUserDropdownOpen(false);
+    router.push("/login");
   };
 
   const displayName =
@@ -362,6 +371,8 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({
         open={openLogoutModal}
         onOpenChange={setOpenLogoutModal}
         onConfirm={handleLogout}
+        loading={loggingOut}
+        error={logoutError}
       />
     </>
   );

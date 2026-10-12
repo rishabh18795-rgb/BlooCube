@@ -188,30 +188,41 @@ export const cookieAuthUtils = {
 
   setCookie(name: string, value: string, days: number): void {
     if (typeof window === 'undefined') return;
-    
+
     const expires = new Date();
     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
     const isSecure = window.location.protocol === 'https:';
-    // Use top-level domain (if subdomain) so app subpaths share cookie
-    const hostname = window.location.hostname;
-    const parts = hostname.split('.');
-    const domain = parts.length > 2 ? `.${parts.slice(-2).join('.')}` : undefined;
-    const domainAttr = domain ? `;domain=${domain}` : '';
     const secureAttr = isSecure ? ';Secure' : '';
-    // Lax avoids breaking typical navigations in production behind redirects
-    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax${secureAttr}${domainAttr}`;
+    // SameSite must match what the server actually set this cookie with
+    // (backend/src/utils/cookies.ts: None+Secure in production so the
+    // cookie survives the frontend/backend cross-site split, Lax+no-Secure
+    // in local dev) — a mismatched SameSite isn't itself disqualifying for
+    // overwrite/delete (name+domain+path is the real identity), but keeping
+    // it consistent avoids relying on that.
+    const sameSiteAttr = isSecure ? 'None' : 'Lax';
+    // No explicit Domain attribute: the server sets this cookie host-only
+    // (see backend/src/utils/cookies.ts — no `domain` in baseOpts), so the
+    // client must match that exactly to reliably read/overwrite/delete the
+    // same cookie entry. A `;domain=` attribute here previously tried to
+    // compute a shared parent domain for any 3-label hostname (intended for
+    // real subdomains like app.example.com), but on a multi-tenant platform
+    // host like bloocube-platform.vercel.app that parent is `vercel.app` —
+    // a public suffix shared by every unrelated Vercel project, not a
+    // domain this app owns. Browsers reject or silently no-op a cookie
+    // write scoped to a public suffix, so the intended overwrite/delete
+    // never touched the real host-only cookie at all.
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=${sameSiteAttr}${secureAttr}`;
   },
 
   deleteCookie(name: string): void {
     if (typeof window === 'undefined') return;
-    
+
     const isSecure = window.location.protocol === 'https:';
-    const hostname = window.location.hostname;
-    const parts = hostname.split('.');
-    const domain = parts.length > 2 ? `.${parts.slice(-2).join('.')}` : undefined;
-    const domainAttr = domain ? `;domain=${domain}` : '';
     const secureAttr = isSecure ? ';Secure' : '';
-    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Lax${secureAttr}${domainAttr}`;
+    const sameSiteAttr = isSecure ? 'None' : 'Lax';
+    // See setCookie() above — no Domain attribute, must match the cookie's
+    // actual (host-only) scope to actually delete it.
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=${sameSiteAttr}${secureAttr}`;
   },
 
   // Debug function to check authentication state
