@@ -41,7 +41,7 @@ const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
-    const target = user?.role === "brand" ? "/brand" : "/creator";
+    const target = user?.role === "brand" ? "/brand" : user?.role === "admin" ? "/admin" : "/creator";
     if (typeof window !== "undefined") {
       router.replace(target);
     }

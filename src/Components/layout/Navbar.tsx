@@ -20,7 +20,7 @@ const navItems = [
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const { isAuthenticated, user } = useAuth();
-  const dashboardHref = user?.role === "brand" ? "/brand" : "/creator";
+  const dashboardHref = user?.role === "brand" ? "/brand" : user?.role === "admin" ? "/admin" : "/creator";
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-slate-200">

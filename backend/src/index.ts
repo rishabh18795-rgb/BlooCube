@@ -21,6 +21,13 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3080';
 
+// Railway terminates TLS and proxies requests through its own edge, so
+// req.ip/req.secure only reflect the real client when Express is told to
+// trust the X-Forwarded-* headers from that one hop. Required for the
+// auth rate limiters (routes/auth.ts) to key on real client IPs instead
+// of Railway's proxy IP.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());

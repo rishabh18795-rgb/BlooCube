@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -12,6 +13,33 @@ const RESET_SECRET = process.env.JWT_ACCESS_SECRET || 'dev-access-secret-change-
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3080';
 
 const router = Router();
+
+// Brute-force / credential-stuffing protection on the sensitive auth
+// endpoints. Keyed by IP via req.ip — correct real client IPs behind
+// Railway's reverse proxy require app.set('trust proxy', ...) in index.ts.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many login attempts. Please try again in a few minutes.' },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many signup attempts from this network. Please try again later.' },
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many password reset requests. Please try again in a few minutes.' },
+});
 
 function publicUser(u: { id: string; name: string; email: string; role: string; isActive: boolean; isVerified: boolean; avatarUrl: string | null }) {
   return {
@@ -33,7 +61,7 @@ const registerSchema = z.object({
   role: z.enum(['creator', 'brand']),
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.issues[0]?.message || 'Invalid input', 422);
   const { name, email, password, role } = parsed.data;
@@ -73,7 +101,7 @@ router.get('/check-email', async (req, res) => {
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, 'Email and password are required', 422);
   const { email, password } = parsed.data;
@@ -123,7 +151,7 @@ router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
 // No email provider is configured in local dev. Rather than silently fail
 // or fake a "sent" email, we log the reset link to the backend console —
 // same honesty rule as skipping OTP on register (see NotificationService).
-router.post('/request-password-reset', async (req, res) => {
+router.post('/request-password-reset', passwordResetLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return fail(res, 'Email is required', 422);
 
@@ -138,7 +166,7 @@ router.post('/request-password-reset', async (req, res) => {
   return ok(res, { message: 'If an account exists, a reset link has been sent to your email.' });
 });
 
-router.post('/reset-password/:token', async (req, res) => {
+router.post('/reset-password/:token', passwordResetLimiter, async (req, res) => {
   const { newPassword } = req.body || {};
   if (!newPassword || String(newPassword).length < 6) return fail(res, 'Password must be at least 6 characters', 422);
 

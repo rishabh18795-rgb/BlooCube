@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { User, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -55,25 +55,34 @@ const SignupForm: React.FC = () => {
     if (emailParam) setEmail(decodeURIComponent(emailParam));
   }, [searchParams]);
 
-  // Debounced email existence check
+  // Debounced email existence check. latestEmailRef guards against an
+  // in-flight check for a previously-typed email resolving after a newer
+  // one has already started (abort() rejects the fetch promise, but a
+  // request already on the wire can still resolve) by re-validating the
+  // email the result is for against the latest field value before applying it.
+  const latestEmailRef = useRef(email);
+  latestEmailRef.current = email;
+
   useEffect(() => {
     if (!email) {
       setEmailExists(null);
       return;
     }
     const controller = new AbortController();
+    const checkedEmail = email;
     const t = setTimeout(async () => {
       try {
         setCheckingEmail(true);
-        const qs = new URLSearchParams({ email });
+        const qs = new URLSearchParams({ email: checkedEmail });
         const res = await fetch(`/api/auth/check-email?${qs.toString()}`, {
           signal: controller.signal,
         });
         const data = await res.json();
-        if (data?.success) setEmailExists(!!data.data?.exists);
-        else setEmailExists(null);
+        if (latestEmailRef.current === checkedEmail) {
+          setEmailExists(data?.success ? !!data.data?.exists : null);
+        }
       } catch {
-        setEmailExists(null);
+        if (!controller.signal.aborted) setEmailExists(null);
       } finally {
         setCheckingEmail(false);
       }
@@ -88,7 +97,7 @@ const SignupForm: React.FC = () => {
   // after every hook above it (Rules of Hooks — an early return before a
   // useState/useEffect call would skip it conditionally).
   if (!authLoading && isAuthenticated) {
-    const target = user?.role === 'brand' ? '/brand' : '/creator';
+    const target = user?.role === 'brand' ? '/brand' : user?.role === 'admin' ? '/admin' : '/creator';
     if (typeof window !== 'undefined') {
       router.replace(target);
     }
