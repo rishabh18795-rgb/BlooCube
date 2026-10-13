@@ -18,6 +18,7 @@ import { useRef } from "react";
 import { profileApi, UserProfile, ProfileUpdateData, ChangePasswordData, formatPhoneNumber, parsePhoneNumber, getProfileCompletenessColor, getProfileCompletenessMessage, getAvatarUrl } from '@/lib/profile';
 import { useTextPersistence } from '@/hooks/useTextPersistence';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { cookieAuthUtils } from '@/lib/cookieAuth';
 import { apiRequest } from '@/lib/apiClient';
 
 interface NotificationState {
@@ -464,9 +465,8 @@ function SettingsPageContent() {
         setNotification({ type: 'success', message: 'Account deleted successfully. You will be redirected to login.' });
         setTimeout(() => {
           // Clear user data and redirect (cookies will be cleared by server)
-          const { cookieAuthUtils } = require('@/lib/cookieAuth');
           cookieAuthUtils.clearAuth();
-          window.location.href = '/auth/login';
+          window.location.href = '/login';
         }, 3000);
       }
     } catch (error: any) {
