@@ -2,11 +2,14 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/Components/ui/Button";
+import { apiRequest } from "@/lib/apiClient";
+import { getFriendlyMessage } from "@/lib/errors";
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,23 +22,18 @@ const ForgotPasswordPage: React.FC = () => {
     }
 
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL as string;
-      const res = await fetch(`${base}/api/auth/request-password-reset`, {
+      setIsSubmitting(true);
+      await apiRequest("/api/auth/request-password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include', // Include cookies to check authentication
-        body: JSON.stringify({ email, fromSettings: false }), // Explicitly mark as from login page
+        body: JSON.stringify({ email, fromSettings: false }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || "Failed to send reset email");
-      }
 
       setMessage("If an account exists, a reset link has been sent to your email.");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(getFriendlyMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -56,8 +54,8 @@ const ForgotPasswordPage: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="px-4 py-2 rounded-xl bg-white/10 placeholder:text-white/50 focus:outline-none"
           />
-          <Button type="submit"  className="w-full mt-2">
-            Send Reset Link
+          <Button type="submit" disabled={isSubmitting} className="w-full mt-2">
+            {isSubmitting ? "Sending..." : "Send Reset Link"}
           </Button>
         </form>
 

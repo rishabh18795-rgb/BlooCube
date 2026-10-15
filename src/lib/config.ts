@@ -49,10 +49,14 @@ export const getApiBase = (): string => {
   const runtime = (globalThis as any)?.NEXT_PUBLIC_API_URL as string | undefined;
   const base = runtime || process.env.NEXT_PUBLIC_API_URL;
 
+  // No base configured (or explicitly empty) means: call this same deployment's
+  // own origin. next.config.ts rewrites /api/* to BACKEND_API_URL server-side,
+  // so a relative path works no matter which domain (apex, www, or the
+  // vercel.app URL) actually served the page — an absolute cross-origin base
+  // here would otherwise get blocked by CORS when the page is loaded from a
+  // domain other than the one baked into this value at build time.
   if (!base) {
-    console.warn('⚠️ NEXT_PUBLIC_API_URL is not set. Using fallback configuration.');
-    // Fallback to production API URL
-    return 'https://api-backend.Bloocube.com';
+    return '';
   }
   return base.replace(/\/+$/, '');
 };

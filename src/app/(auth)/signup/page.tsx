@@ -438,6 +438,17 @@ const SignupForm: React.FC = () => {
             )}
           </Button>
 
+          {!isLoading && (passwordTouched || password.length > 0) && !isStrongPassword && (
+            <p className="text-xs text-amber-600 text-center -mt-2">
+              Password doesn&apos;t meet the requirements above yet.
+            </p>
+          )}
+          {!isLoading && isStrongPassword && (confirmTouched || confirm.length > 0) && !passwordsMatch && (
+            <p className="text-xs text-amber-600 text-center -mt-2">
+              Confirm password must match the password above.
+            </p>
+          )}
+
           <p className="mt-5 text-center text-slate-500 text-sm z-50">
             Already have an account?{" "}
             <Link
