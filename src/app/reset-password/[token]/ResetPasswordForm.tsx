@@ -7,6 +7,8 @@ import { Button } from "@/Components/ui/Button";
 import { Input } from "@/Components/ui/Input";
 import { Label } from "@/Components/ui/Label";
 import { Alert, AlertDescription } from "@/Components/ui/Alert";
+import { apiRequest } from "@/lib/apiClient";
+import { getFriendlyMessage } from "@/lib/errors";
 
 export default function ResetPasswordForm({ token }: { token: string }) {
   const [password, setPassword] = useState<string>("");
@@ -40,32 +42,26 @@ export default function ResetPasswordForm({ token }: { token: string }) {
 
     try {
       setIsLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      if (!apiUrl) throw new Error("API URL not configured");
-
-      const res = await fetch(`${apiUrl}/api/auth/reset-password/${token}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newPassword: password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || "Failed to reset password");
-      }
+      const data = await apiRequest<{ redirectTo?: string }>(
+        `/api/auth/reset-password/${token}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newPassword: password }),
+        }
+      );
 
       // Determine redirect based on response or default to login
-      const redirectTo = data.redirectTo || 'login';
+      const redirectTo = data?.redirectTo || 'login';
       const redirectPath = redirectTo === 'settings' ? '/creator/settings' : '/login';
-      const redirectMessage = redirectTo === 'settings' 
-        ? "Password reset successful! Redirecting to settings..." 
+      const redirectMessage = redirectTo === 'settings'
+        ? "Password reset successful! Redirecting to settings..."
         : "Password reset successful! Redirecting to login...";
-      
+
       setMessage(redirectMessage);
       setTimeout(() => router.push(redirectPath), 2000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(getFriendlyMessage(err));
     } finally {
       setIsLoading(false);
     }
