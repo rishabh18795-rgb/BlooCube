@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db';
 import { ok, fail } from '../utils/responses';
 import { requireAuth, requireRole, AuthedRequest } from '../middleware/auth';
+import { failWithdrawal } from '../services/adminWithdrawalService';
 
 const router = Router();
 
@@ -75,8 +76,16 @@ router.get('/withdrawals', async (req, res) => {
 
 router.put('/withdrawals/:id/status', async (req, res) => {
   const { status } = req.body || {};
-  if (!['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'].includes(String(status).toUpperCase())) return fail(res, 'Invalid status', 422);
-  const withdrawal = await prisma.withdrawal.update({ where: { id: req.params.id }, data: { status: String(status).toUpperCase() as any } });
+  const newStatus = String(status).toUpperCase();
+  if (!['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'].includes(newStatus)) return fail(res, 'Invalid status', 422);
+
+  if (newStatus === 'FAILED') {
+    const result = await failWithdrawal(req.params.id);
+    if (!result.ok) return fail(res, 'Withdrawal not found or already marked failed', 404);
+    return ok(res, { withdrawal: { _id: result.withdrawalId, status: 'failed' } });
+  }
+
+  const withdrawal = await prisma.withdrawal.update({ where: { id: req.params.id }, data: { status: newStatus as any } });
   if (withdrawal.status === 'COMPLETED') {
     const wallet = await prisma.wallet.findUnique({ where: { id: withdrawal.walletId } });
     if (wallet) {
