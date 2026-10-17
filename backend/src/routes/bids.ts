@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db';
 import { ok, fail } from '../utils/responses';
 import { requireAuth, requireRole, AuthedRequest } from '../middleware/auth';
-import { applicationToBidJson } from '../utils/mappers';
+import { applicationToBidJson, bidStatusFilterToPrismaWhere } from '../utils/mappers';
 import { NotificationService } from '../services/notificationService';
 
 const router = Router();
@@ -15,7 +15,7 @@ router.get('/', requireAuth, requireRole('CREATOR'), async (req: AuthedRequest, 
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(50, Number(req.query.limit) || 20);
   const where: Record<string, unknown> = { creatorId: creator.id };
-  if (req.query.status) where.status = String(req.query.status).toUpperCase();
+  if (req.query.status) where.status = bidStatusFilterToPrismaWhere(String(req.query.status));
   if (req.query.campaign_id) where.campaignId = req.query.campaign_id;
 
   const [apps, total] = await Promise.all([

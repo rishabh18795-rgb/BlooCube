@@ -1,3 +1,15 @@
+// Translates the frontend's collapsed 'pending' bid-status filter into the
+// actual set of ApplicationStatus enum values it stands for, so a Prisma
+// `where` clause built from a status query param matches real rows instead
+// of a non-existent 'PENDING' enum value. Other statuses pass through
+// unchanged (uppercased) since they map 1:1 with the enum.
+export function bidStatusFilterToPrismaWhere(status: string): string | { in: string[] } {
+  if (status.toLowerCase() === 'pending') {
+    return { in: ['SUBMITTED', 'UNDER_REVIEW', 'SHORTLISTED'] };
+  }
+  return status.toUpperCase();
+}
+
 type PrismaCampaign = {
   id: string;
   brandId: string;
@@ -136,11 +148,21 @@ export function applicationToBidJson(a: {
   campaign?: { id: string; title: string } | null;
   creator?: { id: string; userId: string; user?: { name: string } } | null;
 }) {
+  // The frontend's Bid type only knows 'pending' | 'accepted' | 'rejected' |
+  // 'withdrawn' | 'completed' — it has no concept of the backend's more
+  // granular SUBMITTED / UNDER_REVIEW / SHORTLISTED review stages, all of
+  // which are still awaiting a brand decision. Collapse them to 'pending' so
+  // the Accept/Reject UI (which only renders for status === 'pending')
+  // actually sees bids that are open for action.
+  const bidStatus = ['SUBMITTED', 'UNDER_REVIEW', 'SHORTLISTED'].includes(a.status)
+    ? 'pending'
+    : a.status.toLowerCase();
+
   return {
     _id: a.id,
     campaign_id: a.campaign ? { _id: a.campaign.id, title: a.campaign.title } : a.campaignId,
     creator_id: a.creator ? { _id: a.creator.id, name: a.creator.user?.name } : a.creatorId,
-    status: a.status.toLowerCase(),
+    status: bidStatus,
     proposal_text: a.proposal,
     bid_amount: a.bidAmount,
     currency: 'INR',

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db';
 import { ok, fail } from '../utils/responses';
 import { requireAuth, requireRole, AuthedRequest } from '../middleware/auth';
-import { campaignToJson, applicationToBidJson } from '../utils/mappers';
+import { campaignToJson, applicationToBidJson, bidStatusFilterToPrismaWhere } from '../utils/mappers';
 import { NotificationService } from '../services/notificationService';
 
 const router = Router();
@@ -174,9 +174,12 @@ router.get('/:campaignId/bids', requireAuth, async (req: AuthedRequest, res) => 
   if (campaign.brand.userId !== req.userId && req.userRole !== 'ADMIN') return fail(res, 'Forbidden', 403);
 
   const { page, limit, skip } = pagination(req);
+  const where: Record<string, unknown> = { campaignId: campaign.id };
+  if (req.query.status) where.status = bidStatusFilterToPrismaWhere(String(req.query.status));
+
   const [apps, total] = await Promise.all([
-    prisma.campaignApplication.findMany({ where: { campaignId: campaign.id }, include: { campaign: true, creator: { include: { user: true } } }, orderBy: { createdAt: 'desc' }, skip, take: limit }),
-    prisma.campaignApplication.count({ where: { campaignId: campaign.id } }),
+    prisma.campaignApplication.findMany({ where, include: { campaign: true, creator: { include: { user: true } } }, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+    prisma.campaignApplication.count({ where }),
   ]);
   return ok(res, { bids: apps.map(applicationToBidJson), pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
 });

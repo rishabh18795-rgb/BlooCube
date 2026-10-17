@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { campaignService } from '@/lib/campaignService';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -8,6 +9,7 @@ import { ChevronDownIcon, CheckIcon, EyeIcon, ChatBubbleLeftRightIcon, CalendarI
 import { acceptBidApi, rejectBidApi } from '@/hooks/useBids';
 
 export default function BrandBidsPage() {
+  const router = useRouter();
   const { user, isLoading } = useAuth();
   const { profile } = useUserProfile();
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
@@ -400,9 +402,15 @@ export default function BrandBidsPage() {
                       </button>
                     </>
                   )}
-                  <button className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full sm:w-auto">
-                    <ChatBubbleLeftRightIcon className="w-4 h-4" />
-                  </button>
+                  {bid.status === 'accepted' && (
+                    <button
+                      className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full sm:w-auto"
+                      onClick={() => router.push(`/brand/messages?campaignId=${getCampaignIdFromBid(bid)}`)}
+                      title="Message creator"
+                    >
+                      <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

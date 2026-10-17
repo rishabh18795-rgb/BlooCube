@@ -1,13 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useConversations, useMessages } from "@/hooks/useConversations";
 
-export default function BrandMessagesPage() {
+function BrandMessages() {
   const { conversations, loading, refetch } = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
   const { messages, send } = useMessages(activeId);
   const [draft, setDraft] = useState("");
+  const searchParams = useSearchParams();
+
+  // Deep-link support: /brand/messages?campaignId=... selects the
+  // conversation for that campaign once conversations have loaded, so the
+  // "message" action elsewhere in the app (e.g. an accepted bid) can open
+  // the right thread instead of landing on an empty picker.
+  useEffect(() => {
+    if (activeId || loading || conversations.length === 0) return;
+    const campaignId = searchParams.get("campaignId");
+    if (!campaignId) return;
+    const match = conversations.find((c) => c.campaign?._id === campaignId);
+    if (match) setActiveId(match._id);
+  }, [activeId, loading, conversations, searchParams]);
 
   const active = conversations.find((c) => c._id === activeId);
 
@@ -77,5 +91,13 @@ export default function BrandMessagesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BrandMessagesPage() {
+  return (
+    <Suspense fallback={<div className="max-w-6xl mx-auto text-sm text-slate-400">Loading...</div>}>
+      <BrandMessages />
+    </Suspense>
   );
 }
