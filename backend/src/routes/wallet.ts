@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db';
 import { ok, fail } from '../utils/responses';
 import { requireAuth, requireRole, AuthedRequest } from '../middleware/auth';
+import { withdraw } from '../services/walletService';
 
 const router = Router();
 
@@ -23,19 +24,13 @@ router.get('/', requireAuth, requireRole('CREATOR'), async (req: AuthedRequest, 
 
 router.post('/withdraw', requireAuth, requireRole('CREATOR'), async (req: AuthedRequest, res) => {
   const { amount, method, details } = req.body || {};
-  if (!amount || Number(amount) <= 0) return fail(res, 'Withdrawal amount must be greater than zero', 422);
+  const amountNum = Number(amount);
+  if (!amount || amountNum <= 0) return fail(res, 'Withdrawal amount must be greater than zero', 422);
   if (!method || !['upi', 'bank'].includes(method)) return fail(res, 'Invalid withdrawal method', 422);
 
-  const wallet = await prisma.wallet.findUnique({ where: { userId: req.userId! } });
-  if (!wallet || wallet.availableBalance < Number(amount)) return fail(res, 'Insufficient available balance', 400);
-
-  const [, withdrawal] = await prisma.$transaction([
-    prisma.wallet.update({ where: { id: wallet.id }, data: { availableBalance: { decrement: Number(amount) } } }),
-    prisma.withdrawal.create({ data: { walletId: wallet.id, amount: Number(amount), method, details: JSON.stringify(details || {}), status: 'PROCESSING' } }),
-  ]);
-  await prisma.walletTransaction.create({ data: { walletId: wallet.id, type: 'WITHDRAWAL', amount: Number(amount), note: `Withdrawal via ${method}` } });
-
-  return ok(res, { withdrawal: { _id: withdrawal.id, amount: withdrawal.amount, method: withdrawal.method, status: withdrawal.status.toLowerCase() } }, 201);
+  const result = await withdraw(req.userId!, amountNum, method, details);
+  if (!result.ok) return fail(res, 'Insufficient available balance', 400);
+  return ok(res, { withdrawal: { _id: result.withdrawal.id, amount: result.withdrawal.amount, method: result.withdrawal.method, status: result.withdrawal.status } }, 201);
 });
 
 export default router;
