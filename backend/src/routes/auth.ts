@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { ok, fail } from '../utils/responses';
@@ -9,8 +8,8 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/
 import { setAuthCookies, clearAuthCookies } from '../utils/cookies';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../services/emailService';
+import { createPasswordResetToken, claimPasswordResetToken } from '../services/passwordResetService';
 
-const RESET_SECRET = process.env.JWT_ACCESS_SECRET || 'dev-access-secret-change-me';
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3080';
 
 const router = Router();
@@ -158,11 +157,11 @@ router.post('/request-password-reset', passwordResetLimiter, async (req, res) =>
   // account exists, and regardless of whether the email actually sent, to
   // avoid leaking which emails are registered.
   if (user) {
-    const resetToken = jwt.sign({ sub: user.id, purpose: 'password_reset' }, RESET_SECRET, { expiresIn: '30m' });
-    const resetUrl = `${FRONTEND_ORIGIN}/reset-password/${resetToken}`;
+    const rawToken = await createPasswordResetToken(user.id);
+    const resetUrl = `${FRONTEND_ORIGIN}/reset-password/${rawToken}`;
     const result = await sendPasswordResetEmail(email, resetUrl);
     if (!result.sent) {
-      // Never log resetUrl/resetToken here — sendEmail() already logged a
+      // Never log resetUrl/rawToken here — sendEmail() already logged a
       // token-free operational line for this failure.
       console.error(`[password-reset] Email delivery did not succeed for a reset request (reason: ${result.reason})`);
     }
@@ -174,16 +173,10 @@ router.post('/reset-password/:token', passwordResetLimiter, async (req, res) => 
   const { newPassword } = req.body || {};
   if (!newPassword || String(newPassword).length < 6) return fail(res, 'Password must be at least 6 characters', 422);
 
-  let payload: { sub: string; purpose: string };
-  try {
-    payload = jwt.verify(req.params.token, RESET_SECRET) as typeof payload;
-  } catch {
-    return fail(res, 'This reset link is invalid or has expired', 400);
-  }
-  if (payload.purpose !== 'password_reset') return fail(res, 'Invalid reset token', 400);
-
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { id: payload.sub }, data: { passwordHash } });
+  const userId = await claimPasswordResetToken(req.params.token, passwordHash);
+
+  if (!userId) return fail(res, 'This reset link is invalid, expired, or has already been used', 400);
   return ok(res, { redirectTo: 'login' });
 });
 

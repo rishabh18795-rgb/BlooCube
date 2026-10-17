@@ -114,8 +114,29 @@ model User {
   conversationsAsCreator Conversation[]     @relation("ConversationCreator")
   conversationsAsBrand   Conversation[]     @relation("ConversationBrand")
   auditLogs           AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role])
+}
+
+// Dedicated, single-purpose reset-token mechanism — deliberately not a JWT,
+// so it can't be confused with (or forged from) an access/refresh token and
+// doesn't share their signing secret. Only tokenHash (sha256 of the raw
+// token mailed to the user) is stored, never the raw value, so a DB read
+// alone can't be used to reset the account. usedAt is set atomically with
+// the password update in the same transaction, making the token genuinely
+// single-use rather than just time-limited.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model CreatorProfile {
