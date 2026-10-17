@@ -15,7 +15,11 @@ router.get('/', requireAuth, requireRole('CREATOR'), async (req: AuthedRequest, 
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(50, Number(req.query.limit) || 20);
   const where: Record<string, unknown> = { creatorId: creator.id };
-  if (req.query.status) where.status = bidStatusFilterToPrismaWhere(String(req.query.status));
+  if (req.query.status) {
+    const statusFilter = bidStatusFilterToPrismaWhere(String(req.query.status));
+    if (statusFilter === null) return fail(res, `Invalid status filter: ${req.query.status}`, 400);
+    where.status = statusFilter;
+  }
   if (req.query.campaign_id) where.campaignId = req.query.campaign_id;
 
   const [apps, total] = await Promise.all([

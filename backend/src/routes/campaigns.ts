@@ -175,7 +175,11 @@ router.get('/:campaignId/bids', requireAuth, async (req: AuthedRequest, res) => 
 
   const { page, limit, skip } = pagination(req);
   const where: Record<string, unknown> = { campaignId: campaign.id };
-  if (req.query.status) where.status = bidStatusFilterToPrismaWhere(String(req.query.status));
+  if (req.query.status) {
+    const statusFilter = bidStatusFilterToPrismaWhere(String(req.query.status));
+    if (statusFilter === null) return fail(res, `Invalid status filter: ${req.query.status}`, 400);
+    where.status = statusFilter;
+  }
 
   const [apps, total] = await Promise.all([
     prisma.campaignApplication.findMany({ where, include: { campaign: true, creator: { include: { user: true } } }, orderBy: { createdAt: 'desc' }, skip, take: limit }),

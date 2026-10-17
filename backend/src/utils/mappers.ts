@@ -1,13 +1,23 @@
+// The bid-status values the frontend's Bid type actually knows about.
+export const VALID_BID_STATUS_FILTERS = ['pending', 'accepted', 'rejected', 'withdrawn', 'completed'] as const;
+
 // Translates the frontend's collapsed 'pending' bid-status filter into the
 // actual set of ApplicationStatus enum values it stands for, so a Prisma
 // `where` clause built from a status query param matches real rows instead
 // of a non-existent 'PENDING' enum value. Other statuses pass through
-// unchanged (uppercased) since they map 1:1 with the enum.
-export function bidStatusFilterToPrismaWhere(status: string): string | { in: string[] } {
-  if (status.toLowerCase() === 'pending') {
+// unchanged (uppercased) since they map 1:1 with the enum. Returns null for
+// anything outside VALID_BID_STATUS_FILTERS — routes should treat that as a
+// 400, not forward it to Prisma: an unrecognized string has no enum
+// equivalent, and this codebase has no async-error-to-middleware wrapping,
+// so a Prisma validation error here would surface as a hung request rather
+// than a clean response.
+export function bidStatusFilterToPrismaWhere(status: string): string | { in: string[] } | null {
+  const normalized = status.toLowerCase();
+  if (!(VALID_BID_STATUS_FILTERS as readonly string[]).includes(normalized)) return null;
+  if (normalized === 'pending') {
     return { in: ['SUBMITTED', 'UNDER_REVIEW', 'SHORTLISTED'] };
   }
-  return status.toUpperCase();
+  return normalized.toUpperCase();
 }
 
 type PrismaCampaign = {
