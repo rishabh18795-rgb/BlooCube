@@ -58,6 +58,7 @@ router.post('/:collaborationId/release', requireAuth, requireRole('BRAND'), asyn
 
   await prisma.collaboration.update({ where: { id: collaboration.id }, data: { status: 'completed' } });
   const payment = await PaymentService.releasePayment(collaboration.payment.id);
+  if (!payment) return fail(res, 'Payment has already been released', 409);
   await NotificationService.send(collaboration.application.creator.userId, 'PAYMENT_RELEASED', 'Payment released', `₹${(payment.amount - payment.platformFee).toLocaleString('en-IN')} has been added to your wallet.`);
 
   return ok(res, { payment: paymentJson(payment) });
