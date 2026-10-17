@@ -8,6 +8,7 @@ import { ok, fail } from '../utils/responses';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { setAuthCookies, clearAuthCookies } from '../utils/cookies';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { sendPasswordResetEmail } from '../services/emailService';
 
 const RESET_SECRET = process.env.JWT_ACCESS_SECRET || 'dev-access-secret-change-me';
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3080';
@@ -148,20 +149,23 @@ router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   return ok(res, { user: publicUser(user) });
 });
 
-// No email provider is configured in local dev. Rather than silently fail
-// or fake a "sent" email, we log the reset link to the backend console —
-// same honesty rule as skipping OTP on register (see NotificationService).
 router.post('/request-password-reset', passwordResetLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return fail(res, 'Email is required', 422);
 
   const user = await prisma.user.findUnique({ where: { email } });
   // Always return the same generic success message whether or not the
-  // account exists, to avoid leaking which emails are registered.
+  // account exists, and regardless of whether the email actually sent, to
+  // avoid leaking which emails are registered.
   if (user) {
     const resetToken = jwt.sign({ sub: user.id, purpose: 'password_reset' }, RESET_SECRET, { expiresIn: '30m' });
     const resetUrl = `${FRONTEND_ORIGIN}/reset-password/${resetToken}`;
-    console.log(`[password-reset] No email provider configured — reset link for ${email}:\n  ${resetUrl}`);
+    const result = await sendPasswordResetEmail(email, resetUrl);
+    if (!result.sent) {
+      // Never log resetUrl/resetToken here — sendEmail() already logged a
+      // token-free operational line for this failure.
+      console.error(`[password-reset] Email delivery did not succeed for a reset request (reason: ${result.reason})`);
+    }
   }
   return ok(res, { message: 'If an account exists, a reset link has been sent to your email.' });
 });
