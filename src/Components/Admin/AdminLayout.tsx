@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, Briefcase, CreditCard, Wallet, Scale, Settings, LogOut, Shield, Mail } from "lucide-react";
+import { Users, Briefcase, CreditCard, Wallet, Scale, Settings, LogOut, Shield, Mail, ScrollText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { performLogout } from "@/lib/auth";
 
@@ -14,6 +14,7 @@ const NAV = [
   { name: "Withdrawals", href: "/admin/withdrawals", icon: Wallet },
   { name: "Disputes", href: "/admin/disputes", icon: Scale },
   { name: "Contact Messages", href: "/admin/contact", icon: Mail },
+  { name: "Audit Logs", href: "/admin/audit-logs", icon: ScrollText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
