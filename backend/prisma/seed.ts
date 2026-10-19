@@ -1,7 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 
 const prisma = new PrismaClient();
+
+// This seed script must never run against production: it creates/upserts a
+// known admin account, and a prior run against the production database is
+// exactly how admin@bloocube.local ended up exposed (its password was a
+// fixed literal in this file, in a public repo). RAILWAY_ENVIRONMENT is set
+// by Railway on every deploy; NODE_ENV=production covers other hosts.
+if (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') {
+  console.error('Refusing to run prisma/seed.ts: this looks like a production environment. This script is for local development only.');
+  process.exit(1);
+}
 
 // All names/brands below are DEMO DATA for local development only — not real
 // people or real brand partnerships (see project constraints, section 31/32).
@@ -24,7 +35,13 @@ const BRANDS = [
   { companyName: 'AJIO', email: 'ajio@demo.bloocube.local', industry: 'Fashion' },
 ];
 
-const DEMO_PASSWORD = 'Demo@12345';
+// No fixed literal here, ever — this file is public, and a prior run
+// against production with a hardcoded password here is exactly how
+// admin@bloocube.local's password ended up exposed. SEED_DEMO_PASSWORD lets
+// a developer pin a known password in their own (gitignored) local .env for
+// repeated local testing; otherwise a fresh random password is generated
+// per run and printed once below.
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || crypto.randomBytes(12).toString('base64url');
 
 async function main() {
   console.log('Seeding demo data...');
@@ -160,7 +177,7 @@ async function main() {
   }
 
   console.log('Seed complete.');
-  console.log(`Demo login password for all seeded accounts: ${DEMO_PASSWORD}`);
+  console.log(`Demo login password for all seeded accounts (shown only here, not stored anywhere): ${DEMO_PASSWORD}`);
   console.log('Creator logins:', CREATORS.map((c) => c.email).join(', '));
   console.log('Brand logins:', BRANDS.map((b) => b.email).join(', '));
   console.log('Admin login: admin@bloocube.local');
