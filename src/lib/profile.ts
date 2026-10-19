@@ -144,7 +144,7 @@ export const profileApi = {
   // Change password
   changePassword: async (data: ChangePasswordData): Promise<{ success: boolean; message: string }> => {
     return apiRequest('/api/profile/change-password', {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify(data)
     });
   },
