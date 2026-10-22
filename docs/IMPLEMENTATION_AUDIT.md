@@ -47,7 +47,21 @@ Status is backed by evidence (code reference, live test, or deployment log), not
 | Accept/reject bid, authorization, re-acceptance guard | Complete | Campaign-owner check; status-guard blocks re-accepting an already-ACCEPTED bid. |
 | Brand messaging ("Message" button) | Complete | Was a dead button (no `onClick` at all) on the bids page — wired to `/brand/messages?campaignId=...`, with deep-link conversation auto-select added. Scoped to accepted bids only (matches when a conversation row actually gets created). |
 | Conversation/message backend (`/api/conversations`) | Complete | Was already fully implemented and correctly authorized — only the frontend entry point was missing. |
-| Full brand→creator→message workflow, live | **Blocked** | Requires a real test account on each side; the user performs all production account-bound actions themselves per the standing constraint — not executed by the agent. |
+| Full brand→creator→message workflow, live | **Partial — auth done, business workflow pending** | A brand and creator test account now exist (`qa-brand-test@bloocube.com`, `qa-creator-test@bloocube.com`) and both authenticate correctly. Campaign creation → bid → accept → message, as these two accounts, has not yet been executed. |
+
+## 3a. Mock Data / Placeholder / Dead-Route Scan (Brand & Creator Portals)
+
+Explicitly requested scan across `src/app/(dashboard)/brand` and `src/app/(dashboard)/creator`. Core
+marketplace flow (campaigns, bids, payments, messaging) was already audited above and has no undisclosed
+mock data — everything there calls real backend endpoints. Two secondary, out-of-core-flow findings:
+
+| Finding | Where | Status |
+|---|---|---|
+| Social-media auto-posting ("Instagram posting is coming soon") | `creator/posts/page.tsx` | **Honestly disclosed already** — the UI itself shows a "Coming Soon" badge and a toast saying so. A `mockMode` localStorage flag exists for local testing of the posting flow; not reachable by a normal user, and the UI never claims a post succeeded for real while in that mode. Several `TODO: implement view/edit/cancel schedule` comments remain for post-scheduling management — unfinished, not misrepresented. |
+| Hardcoded placeholder avatar URL (`/api/placeholder/60/60`) | `brand/analytics/page.tsx`, `creator/competitors/page.tsx` | **Minor, cosmetic** — this path isn't a real route on this backend, so it likely renders a broken image icon in the Analytics/Competitor-tracking pages specifically (not the core marketplace flow). Not fixed this pass — flagging rather than silently leaving undocumented. |
+
+No disconnected forms, dead buttons, or authorization gaps were found beyond what's already listed
+elsewhere in this document (the brand "Message" button fix, the creator/brand verification UI fix).
 
 ## 4. Payments & Wallet
 
@@ -73,10 +87,10 @@ Status is backed by evidence (code reference, live test, or deployment log), not
 
 1. ~~Admin password exposed and live~~ — **Resolved 2026-10-22.** Rotated and verified (see §2).
 2. **Git history still contains the old (now-inert) password** — low priority now that it's rotated; needs contributor coordination before any force-push, not just owner approval.
-3. **Live test of admin-API role rejection with a forged token** — blocked by a safety gate; relying on code-level verification (high confidence, not live-fire).
-4. **Full three-portal end-to-end workflow** — blocked on the owner creating test accounts (standing constraint: no account creation on production by the agent).
+3. ~~Live test of admin-API role rejection~~ — **Resolved 2026-10-22, with real test accounts (not a forged token).** Owner authorized creating isolated brand + creator test accounts directly in production (`qa-brand-test@bloocube.com`, `qa-creator-test@bloocube.com`). Live `curl` tests against the production API confirm: both log in successfully with correct role; both get a clean 403 Forbidden from `/api/admin/overview`; wrong password is rejected (401); logout genuinely invalidates the session server-side (a post-logout request to a protected route returns 401, not a stale-but-still-valid session). See the Login-Access Table in `FINAL_IMPLEMENTATION_REPORT.md` §15.
+4. **Full three-portal end-to-end *workflow*** (campaign creation, bidding, acceptance, messaging as these two new accounts) — not yet executed; auth and role-isolation are now verified, but the business-logic workflow itself still needs a dedicated pass.
 5. **Resend email delivery** — blocked on the owner configuring `RESEND_API_KEY`/`EMAIL_FROM`.
-6. **Backend deploy of commits `9181da9` + `5102c67`** — still blocked as of 2026-10-22 09:xx UTC, reconfirmed via both Railway's own status page (Major Outage, builds disabled for non-Enterprise tiers) and a direct `railway up` attempt (`"Deploys have been paused due to an upstream issue"`). See the deployment checklist in `FINAL_IMPLEMENTATION_REPORT.md` for exactly what to run once this clears.
+6. **Backend deploy of commits `9181da9` + `5102c67`** — still blocked as of 2026-10-22, reconfirmed via both Railway's own status page (Major Outage, builds disabled for non-Enterprise tiers) and a direct `railway up` attempt (`"Deploys have been paused due to an upstream issue"`). A direct consequence, also confirmed live: the admin account can currently still log in via the public `/login` (the live backend hasn't picked up the `9181da9` block yet) — expected to close once this deploy lands, not a bug to chase in the meantime. See the deployment checklist in `FINAL_IMPLEMENTATION_REPORT.md` §12.
 
 ## 7. Dependency/Build Health
 

@@ -194,22 +194,42 @@ nothing has regressed, the new office-admin backend route simply isn't reachable
   agent; no value, including the requested `admin123`, was ever written to source, logs, or committed
   anywhere.
 
-## 15. Known Risks and Next Actions (in priority order)
+## 15. Login-Access Table (live-verified 2026-10-22)
+
+Brand and creator test accounts did not exist before this pass — owner explicitly authorized creating
+them directly in production (same method as the admin rotation: random credentials via Railway SSH,
+disclosed once in chat, never written to source/docs/logs).
+
+| Role | Login URL | Test email/ID | Password | Status |
+|---|---|---|---|---|
+| Brand | `https://bloocube.com/login` | `qa-brand-test@bloocube.com` | Disclosed once in chat this session | **PASS** — live: login 200, wrong-password 401, logout invalidates session (post-logout request to a protected route returns 401), admin API correctly returns 403 |
+| Creator | `https://bloocube.com/login` | `qa-creator-test@bloocube.com` | Disclosed once in chat this session | **PASS** — live: login 200, admin API correctly returns 403 |
+| Existing Admin | `https://bloocube.com/login` (temporary — see note) | `admin@bloocube.local` | Rotated this session, disclosed once in chat | **PASS, with a caveat** — live: login 200, `/api/admin/overview` fully accessible (30 users, 18 creators, 11 brands at time of check). This works *only* because the currently-live backend still runs the pre-`9181da9` code, which doesn't yet block admin on `/login`. Once the pending deploy lands, this specific door closes by design and `/office-admin/login` becomes the only way in — expected behavior, not a regression to watch for. |
+| Office Admin | `https://bloocube.com/office-admin/login` | `admin@bloocube.local` (same account) | N/A yet | **BLOCKED** — confirmed live: `POST /api/auth/office-login` → 404 "No route", because commits `9181da9`/`5102c67` are not yet deployed (Railway outage, §12). Frontend page itself renders correctly. |
+
+All role-isolation and session checks above were executed against the live production API with `curl`,
+not inferred from code — each request/response pair was inspected directly.
+
+## 16. Known Risks and Next Actions (in priority order)
 
 1. ~~Rotate the exposed admin password~~ — **Done 2026-10-22**, verified (see §6).
 2. Retry the Railway backend deploy using the checklist in §12 once their status page confirms builds
-   restored — this is now the top blocker.
+   restored — this is now the top blocker, and closes the "admin still reachable via public /login"
+   caveat above.
 3. Decide on the git-history rewrite for the old (now-inert) password — lower priority than before
    rotation, still needs contributor coordination before any force-push, not just owner approval.
 4. Configure Resend credentials to unblock real email delivery.
-5. Decide on the requested test account (`bloocube@admin.com`) — create it yourself, or explicitly
-   authorize the agent to.
-6. Run the full three-portal workflow test, and the live office-login/admin-API verification in the
-   §12 checklist, once both the Railway deploy succeeds and test accounts exist.
+5. Decide on the originally-requested `bloocube@admin.com` test account — not created (the two QA
+   accounts above were created instead, covering brand+creator; a second admin account is a separate,
+   not-yet-authorized decision).
+6. Rotate the two new QA test account passwords (or delete the accounts) once you've verified them
+   yourself — they currently hold the one-time credentials disclosed in chat.
+7. Re-run the office-login and admin-API checks in §12's checklist once the Railway deploy succeeds, to
+   confirm the public-`/login`-blocks-admin behavior actually takes effect.
 
 ---
 
-**Portal entry points**: `https://bloocube.com/login` (brand/creator) · `https://bloocube.com/admin`
-(existing admin, reachable only via an admin session, never via public `/login` after this engagement)
-· `https://bloocube.com/office-admin/login` (new dedicated office portal — frontend live, backend
-pending the Railway outage).
+**Portal entry points**: `https://bloocube.com/login` (brand/creator, and — temporarily, until the next
+deploy — existing admin) · `https://bloocube.com/admin` (existing admin dashboard) ·
+`https://bloocube.com/office-admin/login` (new dedicated office portal — frontend live, backend pending
+the Railway outage).
