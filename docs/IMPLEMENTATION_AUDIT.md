@@ -47,7 +47,7 @@ Status is backed by evidence (code reference, live test, or deployment log), not
 | Accept/reject bid, authorization, re-acceptance guard | Complete | Campaign-owner check; status-guard blocks re-accepting an already-ACCEPTED bid. |
 | Brand messaging ("Message" button) | Complete | Was a dead button (no `onClick` at all) on the bids page — wired to `/brand/messages?campaignId=...`, with deep-link conversation auto-select added. Scoped to accepted bids only (matches when a conversation row actually gets created). |
 | Conversation/message backend (`/api/conversations`) | Complete | Was already fully implemented and correctly authorized — only the frontend entry point was missing. |
-| Full brand→creator→message workflow, live | **Partial — auth done, business workflow pending** | A brand and creator test account now exist (`qa-brand-test@bloocube.com`, `qa-creator-test@bloocube.com`) and both authenticate correctly. Campaign creation → bid → accept → message, as these two accounts, has not yet been executed. |
+| Full brand→creator→message workflow, live | **Complete — live-verified 2026-10-22** | Executed through the real browser + production API: campaign creation/publish → creator discovery/bid → brand accept → exactly one collaboration (DB-verified) → escrow payment with correct 10% commission (DB-verified) → message sent and received both directions → data persists after logout/login on both sides. Duplicate bid, duplicate acceptance, and wrong-role access attempts all correctly rejected (409/400/403). Full detail: `FINAL_IMPLEMENTATION_REPORT.md` §17. Not covered: deliverable/milestone submission, revision flow, payment release. |
 
 ## 3a. Mock Data / Placeholder / Dead-Route Scan (Brand & Creator Portals)
 
@@ -58,7 +58,7 @@ mock data — everything there calls real backend endpoints. Two secondary, out-
 | Finding | Where | Status |
 |---|---|---|
 | Social-media auto-posting ("Instagram posting is coming soon") | `creator/posts/page.tsx` | **Honestly disclosed already** — the UI itself shows a "Coming Soon" badge and a toast saying so. A `mockMode` localStorage flag exists for local testing of the posting flow; not reachable by a normal user, and the UI never claims a post succeeded for real while in that mode. Several `TODO: implement view/edit/cancel schedule` comments remain for post-scheduling management — unfinished, not misrepresented. |
-| Hardcoded placeholder avatar URL (`/api/placeholder/60/60`) | `brand/analytics/page.tsx`, `creator/competitors/page.tsx` | **Minor, cosmetic** — this path isn't a real route on this backend, so it likely renders a broken image icon in the Analytics/Competitor-tracking pages specifically (not the core marketplace flow). Not fixed this pass — flagging rather than silently leaving undocumented. |
+| Hardcoded placeholder avatar URL (`/api/placeholder/60/60`) | `brand/analytics/page.tsx`, `creator/competitors/page.tsx` | **Fixed — and reassessed.** On closer inspection this field was never actually rendered anywhere (confirmed via a full-file grep for `avatar` in both files) — not a visible broken image after all, just dead data. Removed. |
 
 No disconnected forms, dead buttons, or authorization gaps were found beyond what's already listed
 elsewhere in this document (the brand "Message" button fix, the creator/brand verification UI fix).

@@ -12,9 +12,12 @@ backend, no duplicated marketplace data.
 
 **Update, 2026-10-22**: the exposed admin password has been rotated and verified (owner explicitly
 authorized this specific action). The old value, still present in this repo's git history, no longer
-grants access. The remaining open item that matters most is the Railway platform outage currently
-blocking the backend half of the office-admin deploy — external, not a code problem, tracked with a
-precise restart checklist in §12 below.
+grants access. **The full campaign→bid→accept→message workflow has now been live-tested end to end**
+through the real browser and production API using the QA test accounts — see §17 — including exactly
+one collaboration being created, correct escrow/commission math, and three invalid-action cases
+(duplicate bid, duplicate acceptance, wrong-role access) all correctly rejected. The remaining open item
+that matters most is the Railway platform outage currently blocking the backend half of the office-admin
+deploy — external, not a code problem, tracked with a precise restart checklist in §12 below.
 
 ## 2. Initial Audit Findings
 
@@ -226,6 +229,70 @@ not inferred from code — each request/response pair was inspected directly.
    yourself — they currently hold the one-time credentials disclosed in chat.
 7. Re-run the office-login and admin-API checks in §12's checklist once the Railway deploy succeeds, to
    confirm the public-`/login`-blocks-admin behavior actually takes effect.
+
+## 17. Live End-to-End Marketplace Test (2026-10-22)
+
+Executed directly through the browser and the production API against `qa-brand-test@bloocube.com` /
+`qa-creator-test@bloocube.com` — not a code-review inference. All test data is clearly labeled
+("QA TEST ..."). No real users, charges, or payouts were touched.
+
+| Step | Result | Evidence |
+|---|---|---|
+| Brand login | **PASS** | Real browser login, landed on `/brand`, 0 campaigns (fresh account) |
+| Create + publish campaign | **PASS** | Full 5-step wizard completed (`QA TEST CAMPAIGN - E2E Verification`, ₹5,000–₹15,000, Instagram/Tech/India/Micro); `POST /api/campaigns → 201`; appeared under "Active Campaigns" with `active` status |
+| Brand logout | **PASS** | Confirmation modal → session cleared → redirected to `/login`; re-confirms the earlier P0 logout fix still holds |
+| Creator login | **PASS** | Landed on `/creator`; the just-published campaign appeared immediately in "Recommended Campaigns" (platform/category eligibility matching confirmed working) |
+| Creator discovers + submits bid | **PASS** | `POST /api/bids → 201`; bid appeared under "My Bids" with **`pending`** status and `Pending: 1` in the stats — this is the exact counter that was permanently stuck at 0 before this engagement's bid-status mapping fix |
+| Creator logout / Brand login | **PASS** | Clean round-trip |
+| Brand reviews and accepts bid | **PASS** | Accept/Reject buttons visible (the exact UI the mapping fix restored) → `POST .../accept → 200` → UI updated to `accepted`, Pending 0 → Accepted 1 |
+| Exactly one collaboration created | **PASS, DB-verified** | Direct read-only query: `collaborationCount: 1`, `applicationStatuses: ["ACCEPTED"]` |
+| Payment/escrow created correctly | **PASS, DB-verified** | `Payment` row: `status: IN_ESCROW, amount: 12000, platformFee: 1200` — exactly 10%, confirming commission calculation |
+| Brand "Message" button (post-accept) | **PASS** | Navigated to `/brand/messages?campaignId=...` with the right conversation already auto-selected (the earlier dead-button + deep-link fix) |
+| Send message (brand → creator) | **PASS** | Message sent and displayed; appeared correctly in the conversation list preview |
+| Creator receives message | **PASS** | After creator login, message visible with correct sender/content; `GET /api/conversations/.../messages` confirmed `isMine:false`, correct body, in the raw API response |
+| Data persists after logout/login | **PASS** | Both the accepted-bid status and the message survived full logout → fresh login on both sides |
+| Unread-count tracking | **PASS** (minor client staleness noted) | Conversation list showed a stale unread badge immediately after opening a thread; cleared correctly on a fresh page load. Server-side `readAt` marking confirmed correct — not a backend bug, a low-priority UI refresh timing nit, not fixed this pass |
+| Duplicate bid submission | **PASS (correctly rejected)** | Same creator, same campaign, second `POST /api/bids` → `409 "You have already applied to this campaign"` |
+| Duplicate bid acceptance | **PASS (correctly rejected)** | Re-accepting the same bid → `400 "Application cannot be accepted from its current status"` |
+| Unauthorized action (wrong role) | **PASS (correctly rejected)** | Creator session attempting to call the brand-only accept endpoint → `403 Forbidden` |
+
+**Not executed this pass**: collaboration deliverable/milestone submission, revision requests, completion
+flow, and the brand's manual payment-release action (`/api/payments/:id/release`) — the escrow-hold step
+was verified, release was not attempted, to avoid moving real-feeling data further than needed for this
+pass. Office-admin-side verification of this same campaign/bid/collaboration (via `/office-admin/*`)
+remains blocked on the Railway deploy, same as the rest of that portal.
+
+## 18. Launch-Readiness Checklist
+
+**Ready now:**
+- [x] Brand registration/login/logout
+- [x] Creator registration/login/logout
+- [x] Campaign creation and publish
+- [x] Campaign discovery (platform/category eligibility matching)
+- [x] Bid submission, with correct status mapping
+- [x] Bid accept/reject, with correct authorization and re-acceptance guard
+- [x] Collaboration creation (exactly once, DB-verified)
+- [x] Escrow payment creation with correct commission math
+- [x] Brand↔creator messaging, both directions, with persistence
+- [x] Role isolation (brand/creator cannot reach admin APIs) — live-verified with real accounts
+- [x] Rate limiting + brute-force protection on auth endpoints
+- [x] Audit logging for sensitive admin actions
+- [x] Mobile-responsive layouts on all audited public + admin pages
+
+**Explicitly NOT ready for real launch — do not represent these as live to users:**
+- [ ] Payment provider — confirmed mock only, no real Razorpay/Stripe/etc. integration exists
+- [ ] Password-reset email delivery — code complete, `RESEND_API_KEY`/`EMAIL_FROM` not configured
+- [ ] OTP/email verification on signup — intentionally disabled (`requiresOTP: false`), no provider configured
+- [ ] Creator subscription/membership tier — schema exists, zero purchase flow built anywhere
+- [ ] Instagram auto-posting — UI honestly labeled "Coming Soon", not implemented
+- [ ] Office Admin portal — code complete and frontend deployed, backend blocked on the Railway outage
+
+**Must happen before considering this "launched":**
+1. Resolve the Railway outage and deploy the pending backend commits (checklist in §12)
+2. Decide whether to pursue real payment-provider integration, or launch deliberately payment-mock (e.g. for a pilot/demo), and communicate that choice to users honestly
+3. Configure Resend if email-based password reset is required at launch
+4. Run the collaboration-completion and payment-release flows at least once (not yet tested)
+5. Rotate or delete the QA test accounts before any real users are onboarded
 
 ---
 
