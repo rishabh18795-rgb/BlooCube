@@ -165,31 +165,55 @@ dashboard (Settings → Git) rather than asserting it outright. If confirmed, fu
 
 ## 12. Railway Deployment Status
 
-**Still blocked, reconfirmed a fourth time 2026-10-22 — never assumed stale across any pass.** Pending
-commits span `9181da9` through `1a371a4` (office-login route, admin rejected on `/login`, suspend-reason
-field, plus doc-only updates — no further backend code changes beyond what was already pending).
-Reconfirmed this pass via: (1) Railway's status page — forced a hard reload to rule out caching; content
-identical to every prior check ("Major Outage", builds disabled for non-Enterprise tiers); (2) one direct
-`railway up` attempt — same `"Deploys have been paused due to an upstream issue"` response, treated as the
-authoritative ground truth regardless of what the status page shows. Stopped there, as instructed — no
-repeated attempts. The currently-live backend deployment (`d371185a`, from commit `ff15926`) remains
-healthy (`/health` 200) — nothing has regressed, the new office-admin backend route simply isn't reachable
-yet.
+**Still blocked, reconfirmed a fifth time 2026-10-22 (new session) — never assumed stale across any pass.**
+Pending commits span `9181da9` through `5102c67` (office-login route, admin rejected on `/login`,
+suspend-reason field, the separate office-admin portal) — no backend code changes were needed this pass;
+the route already exists in source and is already registered (`backend/src/index.ts:37` →
+`app.use('/api/auth', authRoutes)`, with `office-login` defined at `backend/src/routes/auth.ts:140`). This
+is purely a deployment-availability gap, not a code defect.
 
-**Local verification re-run fresh this pass** (not relying on cached results from prior sessions):
-backend type-check clean, backend build clean, **21/21** backend tests pass. Frontend type-check clean.
-Frontend lint: 493 pre-existing errors / 10,071 pre-existing warnings across the wider codebase (mostly
-`@typescript-eslint/no-explicit-any` in files never touched by this engagement) — confirmed none are in
-any file added or modified this engagement; a handful of lint hits on `backend/dist/*.js` are the
-*compiled* CommonJS output (`require()` is expected there), not source-code issues. This lint volume is
-pre-existing technical debt, not something introduced here, and fixing it is out of scope for this pass.
+**What changed since the last check**: Railway's incident is now explicitly disclosed as a **security
+incident**, not just a capacity outage — they mass-rotated storage-bucket credentials and recommend
+customers rotate their own externally-held secrets (Postgres/Mongo/MySQL/Redis credentials, API keys).
+This project uses SQLite via a persistent Volume, not a Railway-managed database or bucket, so the
+database-credential-rotation guidance does not apply here; no project secrets are known to have been
+exposed by this incident specifically. Builds are being restored **in stages by plan tier**: as of
+2026-10-22 13:16 UTC the status page reports builds available again for **Pro and Enterprise** workspaces,
+with Hobby/Free/Trial still pending.
+
+Reconfirmed this pass via: (1) Railway's status page, read fresh (not cached) — confirms the staged,
+tier-gated recovery above; (2) one direct `railway up --ci` attempt from `backend/` — still returned
+`"Deploys have been paused due to an upstream issue"`, the same response as every prior check. **The status
+page's partial-recovery language does not mean this project can deploy** — the live attempt is the
+authoritative signal, and it says no. Stopped there, as instructed — no repeated attempts this pass. The
+currently-live backend deployment (`d371185a`, from commit `ff15926`) remains healthy (`/health` → 200,
+confirmed fresh) — nothing has regressed, the new office-admin backend route simply isn't reachable yet.
+
+**Local + remote verification re-run fresh this pass:**
+- Backend type-check clean, backend build clean, **21/21** backend tests pass (fresh run, not cached).
+- Production migration status checked directly via `railway ssh -- npx prisma migrate status` (read-only):
+  "Database schema is up to date!" — all 3 migrations already applied, confirming a deploy right now would
+  need **no migration step**, only the new application code.
+- Confirmed live, unauthenticated: `POST /api/auth/office-login` → `404 "No route..."` (deployed backend
+  predates `9181da9`, as expected); `POST /api/auth/login` → `401` (route alive, server healthy);
+  `GET /api/admin/overview` and `GET /api/admin/audit-logs` without a session → both `401 "Authentication
+  required"` (privileged endpoints correctly reject unauthenticated requests on the currently-deployed
+  code).
+- Confirmed via direct, read-only production DB query: a dedicated `ADMIN`-role account already exists
+  (`admin@bloocube.local`, active, verified, created 2026-10-08, password last rotated 2026-10-22) — no new
+  account needed to be provisioned; it is simply unreachable via `/office-login` until the backend deploy
+  lands.
 
 ### Deployment checklist for when Railway recovers
 
-1. Confirm recovery independently before attempting: check `https://status.railway.com` for "builds
-   restored" (not just "identified a fix") **and** that `railway whoami` still authenticates (tokens were
-   mass-invalidated during this incident — a fresh `railway login` may be needed first).
-2. From `backend/`, confirm the working tree is still clean and `git log -1` shows `324ec75` (or later)
+1. Confirm recovery independently before attempting: check `https://status.railway.com` for builds
+   restored **for this project's specific plan tier** (recovery is staged — Enterprise, then Pro, then
+   Hobby, then Free/Trial — so "builds restored" for one tier does not mean restored for all) **and** that
+   `railway whoami` still authenticates (tokens have been mass-invalidated during this incident more than
+   once — a fresh `railway login` may be needed first). Even then, treat one real `railway up` attempt as
+   the authoritative signal over the status page's wording — it has shown partial-recovery language while
+   still actually rejecting deploys.
+2. From `backend/`, confirm the working tree is still clean and `git log -1` shows `5102c67` (or later)
    before deploying, so the deployed image matches exactly what's been reviewed.
 3. `npx tsc --noEmit`, `npm run build`, `npm test` (expect 21/21) — re-run immediately before deploying,
    not relying on this session's cached results.
