@@ -32,10 +32,10 @@ Status is backed by evidence (code reference, live test, or deployment log), not
 
 | Item | Status | Evidence |
 |---|---|---|
-| Hardcoded admin password in `prisma/seed.ts` | **Found, partially remediated** | Was a plaintext literal, in this public repo, used to create the live `admin@bloocube.local` account. |
+| Hardcoded admin password in `prisma/seed.ts` | **Found, remediated** | Was a plaintext literal, in this public repo, used to create the live `admin@bloocube.local` account. |
 | Source fix | Complete | Commit `0f9d941`: random password generated per run (or `SEED_DEMO_PASSWORD` from a local `.env`); script now refuses to run at all when `RAILWAY_ENVIRONMENT` or `NODE_ENV=production` is detected. Verified locally both paths. |
-| Live credential rotation | **Not done — owner action required** | Checked `updatedAt` on the admin row (read-only, timestamp only): unchanged since original seed. **The exposed password is still live as of this audit.** |
-| Git history scrub | **Not done — needs owner approval** | Old value remains in every historical commit touching that file. Requires `git filter-repo` + force-push to `main`, which affects any existing clone/fork and this repo's other contributor — flagged for explicit go-ahead, not attempted. |
+| Live credential rotation | **Complete, verified 2026-10-22** | Owner explicitly authorized this specific action. Rotated by writing a fresh bcrypt hash directly to the admin row via Railway SSH (no session, no login flow — the old self-service change-password path requires the current password, which was the thing being rotated away from). Verified two ways: `updatedAt` changed from the original seed timestamp to 2026-10-22, and a live login attempt with the old password (`Demo@12345`) now returns 401. The new password was disclosed to the owner once, in chat only — never written to any file, doc, or log. |
+| Git history scrub | **Reviewed — not recommended to rush** | Old value remains in every historical commit touching that file, but the live credential is now rotated, so the leaked value in history no longer grants access — the urgency that previously justified a disruptive force-push rewrite is gone. Still technically present in history as hygiene debt. If pursued later: `git filter-repo` + force-push to `main`, which affects any existing clone/fork and this repo's other contributor — needs explicit coordination with them first, not just owner approval. Not attempted. |
 | Other secrets in repo/history | None found | Full history scan: no `.env` files ever committed (only `.env.example`); no AWS/Stripe/Google key patterns in current source. |
 
 ## 3. Bidding & Collaboration Workflow
@@ -71,12 +71,12 @@ Status is backed by evidence (code reference, live test, or deployment log), not
 
 ## 6. Known Risks / Explicitly Not Attempted
 
-1. **Admin password still exposed and live** — the single most urgent open item (see §2).
-2. **Git history still contains the old password** — needs explicit owner approval given force-push + contributor coordination.
+1. ~~Admin password exposed and live~~ — **Resolved 2026-10-22.** Rotated and verified (see §2).
+2. **Git history still contains the old (now-inert) password** — low priority now that it's rotated; needs contributor coordination before any force-push, not just owner approval.
 3. **Live test of admin-API role rejection with a forged token** — blocked by a safety gate; relying on code-level verification (high confidence, not live-fire).
 4. **Full three-portal end-to-end workflow** — blocked on the owner creating test accounts (standing constraint: no account creation on production by the agent).
 5. **Resend email delivery** — blocked on the owner configuring `RESEND_API_KEY`/`EMAIL_FROM`.
-6. **Backend deploy of commits `9181da9` + `5102c67`** — blocked by a confirmed, active Railway platform outage as of this audit.
+6. **Backend deploy of commits `9181da9` + `5102c67`** — still blocked as of 2026-10-22 09:xx UTC, reconfirmed via both Railway's own status page (Major Outage, builds disabled for non-Enterprise tiers) and a direct `railway up` attempt (`"Deploys have been paused due to an upstream issue"`). See the deployment checklist in `FINAL_IMPLEMENTATION_REPORT.md` for exactly what to run once this clears.
 
 ## 7. Dependency/Build Health
 

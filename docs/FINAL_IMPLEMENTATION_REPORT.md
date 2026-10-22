@@ -10,9 +10,11 @@ authentication hardening, the core bidding workflow, payment/wallet transaction 
 built, separate "office-admin" portal. All changes reuse the existing backend and database — no second
 backend, no duplicated marketplace data.
 
-**The most urgent unresolved item is not a code gap: a production admin password was exposed in this
-public repository's source history and has not yet been rotated by the owner.** This is called out
-first, repeated throughout, and is the one blocker that matters most regardless of everything else below.
+**Update, 2026-10-22**: the exposed admin password has been rotated and verified (owner explicitly
+authorized this specific action). The old value, still present in this repo's git history, no longer
+grants access. The remaining open item that matters most is the Railway platform outage currently
+blocking the backend half of the office-admin deploy — external, not a code problem, tracked with a
+precise restart checklist in §12 below.
 
 ## 2. Initial Audit Findings
 
@@ -86,7 +88,12 @@ engagement, in the order they were discovered:
 - JWT secrets (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`) were rotated earlier in this engagement after
   they briefly appeared in this session's own tool output (not committed, not shared externally) — a
   hygiene rotation, not a response to a confirmed external leak.
-- Admin seed-password exposure: see the Executive Summary and §2 — **still open, owner action required**.
+- Admin seed-password exposure: **resolved 2026-10-22.** Rotated by writing a fresh bcrypt hash directly
+  to the admin row in production (via Railway SSH — no session, no login flow, since the old self-service
+  change-password path requires the password being rotated away from). Verified two ways: the row's
+  `updatedAt` changed from the original seed timestamp, and a live login attempt with the old password
+  now returns 401. The new password was disclosed to the owner once, in chat only — never written to
+  this file, any other file, or any log.
 
 ## 7. Bidding & Collaboration Workflow Details
 
@@ -125,8 +132,9 @@ whenever a real provider is eventually plugged in behind `PaymentService`.
 
 ## 10. GitHub Commits and Branch
 
-Branch: `main`. Commits this engagement (most recent first, illustrative — not exhaustive of the full
-multi-week history): `5102c67` (office-admin portal), `9181da9` (office-login backend split),
+Branch: `main`, working tree clean, HEAD confirmed matching deployed commits at time of writing.
+Commits this engagement (most recent first, illustrative — not exhaustive of the full multi-week
+history): `324ec75` (audit + final report docs), `5102c67` (office-admin portal), `9181da9` (office-login backend split),
 `acbba89` (mobile admin sidebar), `0f9d941` (seed script hardening), `72af221` (withdrawal-failure
 refund fix), `ff15926` (audit logging + dashboard metrics + verify UI), `78532c7` (change-password
 method-mismatch fix), `a24c365` (withdrawal race fix), `1f0b04d` (payment release/refund atomicity),
@@ -141,15 +149,38 @@ verification of the new `/office-admin/*` routes.
 
 ## 12. Railway Deployment Status
 
-**Blocked as of this report.** Commits `9181da9` and `5102c67` (backend: office-login route, admin
-rejected on `/login`, suspend-reason field) are pushed to `main` but **not yet deployed** — every deploy
-attempt returned `"Deploys have been paused due to an upstream issue"`. Confirmed via Railway's own
-status page (status.railway.com): an active, platform-wide **Major Outage**, builds disabled for all
-non-Enterprise tiers, with the same incident having force-invalidated all Railway API tokens (which is
-also why this session's CLI auth had separately expired). This is external and will be retried once
-Railway's status page shows builds restored — not a code or deployment-configuration problem on this
-project's side. The currently-live backend deployment remains the prior commit, healthy (`/health` 200),
-so nothing regressed — the new office-admin backend route simply isn't reachable yet.
+**Still blocked, reconfirmed 2026-10-22 (independently re-checked, not assumed from a prior session).**
+Commits `9181da9` and `5102c67` (backend: office-login route, admin rejected on `/login`,
+suspend-reason field) are pushed to `main` but **not yet deployed**. Reconfirmed via two independent
+checks in this pass: (1) Railway's own status page — still "Major Outage", builds disabled for all
+non-Enterprise tiers, latest update at the time of checking promised a further update by 05:30 UTC;
+(2) a direct `railway up` attempt just now — same `"Deploys have been paused due to an upstream issue"`
+response as every prior attempt. This is external; no further deploy attempts were made this pass beyond
+the one confirmation check, per the instruction not to repeatedly force a blocked action. The
+currently-live backend deployment (`d371185a`, from commit `ff15926`) remains healthy (`/health` 200) —
+nothing has regressed, the new office-admin backend route simply isn't reachable yet.
+
+### Deployment checklist for when Railway recovers
+
+1. Confirm recovery independently before attempting: check `https://status.railway.com` for "builds
+   restored" (not just "identified a fix") **and** that `railway whoami` still authenticates (tokens were
+   mass-invalidated during this incident — a fresh `railway login` may be needed first).
+2. From `backend/`, confirm the working tree is still clean and `git log -1` shows `324ec75` (or later)
+   before deploying, so the deployed image matches exactly what's been reviewed.
+3. `npx tsc --noEmit`, `npm run build`, `npm test` (expect 21/21) — re-run immediately before deploying,
+   not relying on this session's cached results.
+4. `npx @railway/cli up --ci` from `backend/`. Confirm `SUCCESS` in `railway deployment list`, then
+   `curl .../health` → `{"success":true,"status":"ok"}`.
+5. Tail startup logs (`railway logs --deployment`) for the Prisma migration step — expect
+   "No pending migrations to apply" (no new migration shipped since `20261017082809_password_reset_token`,
+   already applied). A different message here means investigate before declaring success.
+6. Live-verify `POST /api/auth/office-login`: a wrong-password attempt against a non-admin test email
+   should return a generic 401 (does not require a real account); a direct `curl` to
+   `/api/auth/login` with the **current rotated** admin credentials should also return 401 (confirms the
+   public-login admin block deployed correctly) — use a value only the owner knows, never typed into this
+   session again.
+7. Once confirmed, update this report's status tables to "Complete, deployed" with the new deployment ID
+   — do not mark office-admin functionality verified from code review alone.
 
 ## 13. Post-Deployment Smoke Tests
 
@@ -165,14 +196,16 @@ so nothing regressed — the new office-admin backend route simply isn't reachab
 
 ## 15. Known Risks and Next Actions (in priority order)
 
-1. **Rotate the exposed admin password now** — this is independent of everything else in this report.
-2. Decide on the git-history rewrite for the old password (needs explicit approval + contributor
-   coordination before any force-push).
-3. Retry the Railway backend deploy once their status page confirms builds are restored.
+1. ~~Rotate the exposed admin password~~ — **Done 2026-10-22**, verified (see §6).
+2. Retry the Railway backend deploy using the checklist in §12 once their status page confirms builds
+   restored — this is now the top blocker.
+3. Decide on the git-history rewrite for the old (now-inert) password — lower priority than before
+   rotation, still needs contributor coordination before any force-push, not just owner approval.
 4. Configure Resend credentials to unblock real email delivery.
 5. Decide on the requested test account (`bloocube@admin.com`) — create it yourself, or explicitly
    authorize the agent to.
-6. Run the full three-portal workflow test once test accounts exist.
+6. Run the full three-portal workflow test, and the live office-login/admin-API verification in the
+   §12 checklist, once both the Railway deploy succeeds and test accounts exist.
 
 ---
 
