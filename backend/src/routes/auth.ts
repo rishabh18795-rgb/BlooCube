@@ -101,16 +101,49 @@ router.get('/check-email', async (req, res) => {
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 
+// Shared by /login and /office-login: looks up the user and verifies the
+// password, but does not decide whether the *role* is allowed to proceed —
+// callers do that and must return the exact same generic message on
+// rejection as on a genuine bad-password case, so neither endpoint ever
+// reveals "this account exists but isn't the right role for this door".
+async function verifyCredentials(email: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return null;
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return null;
+  return user;
+}
+
 router.post('/login', loginLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, 'Email and password are required', 422);
   const { email, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return fail(res, 'Invalid email or password', 401);
+  const user = await verifyCredentials(email, password);
+  // Admin accounts don't get a session from this door at all — same
+  // message as a wrong password, so this endpoint never discloses that an
+  // email belongs to an admin account.
+  if (!user || user.role === 'ADMIN') return fail(res, 'Invalid email or password', 401);
+  if (!user.isActive) return fail(res, 'This account has been deactivated', 403);
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) return fail(res, 'Invalid email or password', 401);
+  const accessToken = signAccessToken({ sub: user.id, role: user.role });
+  const refreshToken = signRefreshToken({ sub: user.id, role: user.role });
+  setAuthCookies(res, accessToken, refreshToken, publicUser(user));
+
+  return ok(res, { user: publicUser(user) });
+});
+
+// Dedicated office-admin login — the only door that can authenticate an
+// ADMIN-role account. Reuses the exact same credential check, token
+// signing, and cookie-setting as /login; the only difference is which
+// role is allowed through.
+router.post('/office-login', loginLimiter, async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, 'Email and password are required', 422);
+  const { email, password } = parsed.data;
+
+  const user = await verifyCredentials(email, password);
+  if (!user || user.role !== 'ADMIN') return fail(res, 'Invalid email or password', 401);
   if (!user.isActive) return fail(res, 'This account has been deactivated', 403);
 
   const accessToken = signAccessToken({ sub: user.id, role: user.role });
