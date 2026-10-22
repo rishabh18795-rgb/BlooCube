@@ -280,11 +280,28 @@ Executed directly through the browser and the production API against `qa-brand-t
 | Duplicate bid acceptance | **PASS (correctly rejected)** | Re-accepting the same bid → `400 "Application cannot be accepted from its current status"` |
 | Unauthorized action (wrong role) | **PASS (correctly rejected)** | Creator session attempting to call the brand-only accept endpoint → `403 Forbidden` |
 
-**Not executed this pass**: collaboration deliverable/milestone submission, revision requests, completion
-flow, and the brand's manual payment-release action (`/api/payments/:id/release`) — the escrow-hold step
-was verified, release was not attempted, to avoid moving real-feeling data further than needed for this
-pass. Office-admin-side verification of this same campaign/bid/collaboration (via `/office-admin/*`)
-remains blocked on the Railway deploy, same as the rest of that portal.
+### 17a. Live Financial Lifecycle Test (2026-10-22, second pass — Railway-independent)
+
+Continuing on the same collaboration above (`cmvjcb2330016mm1j6q0gecvd`). This exercises code that is
+already part of the **currently-deployed** backend (commit `ff15926`, confirmed via `git log`/`git show`
+against that exact commit — the atomic payment/wallet/withdrawal fixes shipped before the current Railway
+outage began), so none of this required or waited on a new deploy.
+
+| Step | Result | Evidence |
+|---|---|---|
+| Creator submits deliverable | **PASS** | `POST /api/collaborations/.../submissions` with a clearly-labeled fake content URL → `201`; collaboration status became `submitted` |
+| Brand sees the submission | **PASS** | `GET /api/collaborations` showed status `submitted` with the correct `contentUrl`/note |
+| Brand releases escrow payment | **PASS** | `POST /api/payments/.../release` → `200`; `amount: 12000, platformFee: 1200, netAmount: 10800, status: "released"` — commission math correct |
+| Double-release blocked | **PASS (correctly rejected)** | Immediate second `POST .../release` → `400 "Payment is not in escrow"`, proving the atomic `updateMany` claim fix from earlier in this engagement holds under a real, live API call, not just in the unit tests |
+| Creator wallet credited | **PASS, DB-verified** | Wallet: `availableBalance: 10800, pendingBalance: 0, totalEarnings: 10800`, with a matching `CREDIT` transaction row |
+| Creator requests withdrawal | **PASS** | `POST /api/wallet/withdraw` with `{amount: 5000, method: "upi", details: {vpa: "qa-test@upi"}}` → `201`, status `processing` |
+| Wallet balance after withdrawal | **PASS, DB-verified** | `availableBalance: 5800` (10800 − 5000, correct), transaction history shows both entries, withdrawal row visible with status `processing` |
+
+**Not executed this pass**: revision requests, the full UI-driven collaboration-completion flow (this was
+done via direct API calls, not clicked through the browser), and an admin marking the withdrawal
+`COMPLETED` or `FAILED` (the `failWithdrawal` refund-on-failure path is unit-tested — see §9 — but not
+re-exercised live this pass). Office-admin-side verification of this same campaign/bid/collaboration/
+withdrawal (via `/office-admin/*`) remains blocked on the Railway deploy, same as the rest of that portal.
 
 ## 18. Launch-Readiness Checklist
 
@@ -302,9 +319,13 @@ remains blocked on the Railway deploy, same as the rest of that portal.
 - [x] Rate limiting + brute-force protection on auth endpoints
 - [x] Audit logging for sensitive admin actions
 - [x] Mobile-responsive layouts on all audited public + admin pages
+- [x] Deliverable submission → escrow release → wallet credit → withdrawal request, live-verified end to
+      end this pass (§17a), including the double-release guard holding under a real API call
 
 **Explicitly NOT ready for real launch — do not represent these as live to users:**
-- [ ] Payment provider — confirmed mock only, no real Razorpay/Stripe/etc. integration exists
+- [ ] Payment provider — confirmed mock only (`mock_...` provider refs), no real Razorpay/Stripe/etc.
+      integration exists; the escrow/release/wallet/withdrawal *mechanics* above are real and correct, but
+      move no real money
 - [ ] Password-reset email delivery — code complete, `RESEND_API_KEY`/`EMAIL_FROM` not configured
 - [ ] OTP/email verification on signup — intentionally disabled (`requiresOTP: false`), no provider configured
 - [ ] Creator subscription/membership tier — schema exists, zero purchase flow built anywhere
@@ -315,7 +336,7 @@ remains blocked on the Railway deploy, same as the rest of that portal.
 1. Resolve the Railway outage and deploy the pending backend commits (checklist in §12)
 2. Decide whether to pursue real payment-provider integration, or launch deliberately payment-mock (e.g. for a pilot/demo), and communicate that choice to users honestly
 3. Configure Resend if email-based password reset is required at launch
-4. Run the collaboration-completion and payment-release flows at least once (not yet tested)
+4. ~~Run the collaboration-completion and payment-release flows at least once~~ — **Done 2026-10-22** (§17a): deliverable submission, release, wallet credit, and withdrawal request all live-verified. Still outstanding: an admin actually completing/failing a withdrawal, and the office-admin UI side of all this (blocked on §12)
 5. Rotate or delete the QA test accounts before any real users are onboarded
 
 ---
