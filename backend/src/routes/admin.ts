@@ -79,9 +79,13 @@ router.get('/users', async (req: AuthedRequest, res) => {
 });
 
 router.put('/users/:id/status', async (req: AuthedRequest, res) => {
-  const { isActive } = req.body || {};
+  const { isActive, reason } = req.body || {};
   const user = await prisma.user.update({ where: { id: req.params.id }, data: { isActive: !!isActive } });
-  await logAdminAction(req.userId!, isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED', { target: user.id, outcome: 'success' });
+  await logAdminAction(req.userId!, isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED', {
+    target: user.id,
+    outcome: 'success',
+    ...(reason ? { reason: String(reason).slice(0, 500) } : {}),
+  });
   return ok(res, { user: { _id: user.id, isActive: user.isActive } });
 });
 
