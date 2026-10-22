@@ -3,52 +3,43 @@
 import { useState } from "react";
 import Image from "next/image";
 import { BadgeCheck } from "lucide-react";
-
-const PALETTE = [
-  "from-rose-400 to-pink-500",
-  "from-orange-400 to-amber-500",
-  "from-violet-400 to-indigo-500",
-  "from-sky-400 to-blue-500",
-  "from-emerald-400 to-teal-500",
-  "from-fuchsia-400 to-purple-500",
-];
-
-function paletteFor(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return PALETTE[hash % PALETTE.length];
-}
-
-function initialsFor(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
+import Character, { type CharacterSpec } from "@/Components/illustrations/Character";
+import { characterFor } from "@/Components/illustrations/cast";
 
 interface CreatorAvatarProps {
   name: string;
+  /** The user's own uploaded photo. Only real, user-provided photos go here. */
   photoUrl?: string | null;
+  /** Picks a niche-appropriate illustrated fallback. */
+  niche?: string | null;
+  /** Explicit illustrated character (marketing sample profiles). */
+  character?: CharacterSpec;
   verified?: boolean;
   className?: string;
   badgeClassName?: string;
+  rounded?: string;
   sizes?: string;
 }
 
 /**
- * Creator avatar. Renders a real photo when `photoUrl` is given, falling
- * back to a deterministic gradient + initials otherwise (and automatically
- * if the photo fails to load). Photos currently wired in are licensed
- * stock photography (Unsplash License — free for commercial use) used as
- * temporary demo placeholders for the seeded demo accounts, not photos of
- * real BlooCube creators — see src/lib/creatorPhotos.ts.
+ * Creator avatar. Renders the creator's own uploaded photo when there is one;
+ * otherwise (or if it fails to load) an illustrated character from the
+ * BlooCube cast, chosen deterministically from the name and niche. Seeded
+ * demo accounts and marketing samples therefore never borrow a real
+ * person's face.
  */
-export default function CreatorAvatar({ name, photoUrl, verified, className = "", badgeClassName = "", sizes = "160px" }: CreatorAvatarProps) {
+export default function CreatorAvatar({
+  name,
+  photoUrl,
+  niche,
+  character,
+  verified,
+  className = "",
+  badgeClassName = "",
+  rounded = "rounded-2xl",
+  sizes = "160px",
+}: CreatorAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
-  const gradient = paletteFor(name);
   const showPhoto = photoUrl && !imgFailed;
 
   return (
@@ -56,19 +47,21 @@ export default function CreatorAvatar({ name, photoUrl, verified, className = ""
       {showPhoto ? (
         <Image
           src={photoUrl}
-          alt={`Portrait of ${name}, a BlooCube demo creator profile`}
+          alt={`Profile photo of ${name}`}
           fill
           sizes={sizes}
-          className="object-cover rounded-2xl"
+          // User uploads can live on any storage host; skip the optimizer's
+          // remotePatterns check rather than crash on an unlisted domain.
+          unoptimized={/^https?:\/\//.test(photoUrl)}
+          className={`object-cover ${rounded}`}
           onError={() => setImgFailed(true)}
         />
       ) : (
-        <div
-          className={`w-full h-full rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold select-none`}
-          aria-hidden="true"
-        >
-          {initialsFor(name)}
-        </div>
+        <Character
+          spec={character ?? characterFor(name, niche)}
+          className={`absolute inset-0 h-full w-full ${rounded}`}
+          title={`Illustrated avatar for ${name}`}
+        />
       )}
       {verified && (
         <span

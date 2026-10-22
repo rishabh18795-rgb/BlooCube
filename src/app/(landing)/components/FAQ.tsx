@@ -8,12 +8,12 @@ export default function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section className="py-16 sm:py-20 bg-brand-lavender">
+    <section className="bg-white py-20 sm:py-24">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <span className="inline-block text-xs font-semibold tracking-wide text-brand-indigo uppercase mb-2">
           FAQ
         </span>
-        <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] mb-8">Frequently asked questions</h2>
+        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-brand-navy mb-8">Frequently asked questions</h2>
 
         <div className="space-y-3">
           {FAQS.map((item, i) => {

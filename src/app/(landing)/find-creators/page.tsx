@@ -5,11 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { apiRequest } from "@/lib/apiClient";
 import CreatorAvatar from "@/Components/CreatorAvatar";
-import { getDemoCreatorPhoto } from "@/lib/creatorPhotos";
 
 type CreatorCard = {
   _id: string;
   name: string;
+  avatarUrl?: string | null;
   verified: boolean;
   niches: string[];
   location: string | null;
@@ -105,7 +105,8 @@ function FindCreatorsContent() {
             >
               <CreatorAvatar
                 name={c.name}
-                photoUrl={getDemoCreatorPhoto(c.name)}
+                photoUrl={c.avatarUrl}
+                niche={c.niches[0]}
                 verified={c.verified}
                 className="aspect-square text-2xl rounded-none"
                 sizes="200px"

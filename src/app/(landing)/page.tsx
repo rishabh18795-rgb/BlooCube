@@ -1,9 +1,12 @@
 import React from "react";
 import Hero from "./components/Hero";
-import TrustedBrands from "./components/TrustedBrands";
-import ExploreCreators from "./components/ExploreCreators";
+import CapabilityStrip from "./components/CapabilityStrip";
 import HowItWorks from "./components/HowItWorks";
-import ValueProps from "./components/ValueProps";
+import BiddingSection from "./components/BiddingSection";
+import ExploreCreators from "./components/ExploreCreators";
+import AnalyticsPreview from "./components/AnalyticsPreview";
+import PortalPreviews from "./components/PortalPreviews";
+import TrustWorkflow from "./components/TrustWorkflow";
 import FAQ from "./components/FAQ";
 import { FAQS } from "./components/faqData";
 import FinalCTA from "./components/FinalCTA";
@@ -43,10 +46,13 @@ export default function LandingPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <Hero />
-      <TrustedBrands />
-      <ExploreCreators />
+      <CapabilityStrip />
       <HowItWorks />
-      <ValueProps />
+      <BiddingSection />
+      <ExploreCreators />
+      <AnalyticsPreview />
+      <PortalPreviews />
+      <TrustWorkflow />
       <FAQ />
       <FinalCTA />
     </>

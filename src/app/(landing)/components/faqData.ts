@@ -5,7 +5,7 @@ export const FAQS = [
   },
   {
     q: "How do payments work?",
-    a: "Campaign funds are held in escrow once a brand selects a creator. Payment is released to the creator after the brand approves the delivered content, so both sides are protected.",
+    a: "BlooCube uses an escrow-style workflow: campaign funds are committed when a brand selects a creator and released to the creator's wallet after the brand approves the delivered content. This workflow is currently in pilot — a live payment gateway for card and UPI payments is still being integrated.",
   },
   {
     q: "Is BlooCube free to join?",
