@@ -152,21 +152,29 @@ mapping fix).
 
 ## 11. Vercel Deployment Status
 
-Deployed and confirmed live: `https://bloocube.com` → `bloocube-platform-kjd5bpgjq-...vercel.app`,
-Production, built from commit `5102c67`. Confirmed via direct HTTP checks (200s) and live browser
-verification of the new `/office-admin/*` routes.
+Deployed and confirmed live: `https://bloocube.com`, Production, `age: 0` (fresh, not stale cache) as of
+2026-10-22. **Observation this pass**: the latest production deployment (`dpl_9t3t9FRHZXQEmP3vj69wwLfzX9Em`,
+~4 minutes old at time of check) carries a `bloocube-platform-git-main-...` alias — a pattern Vercel only
+generates for Git-connected projects with branch auto-deploy. Earlier in this engagement, `vercel git
+connect` had explicitly failed, and every frontend deploy since has been manual (`vercel --prod` after
+each push). This suggests the GitHub↔Vercel connection may now be active (possibly set up manually via
+the dashboard at some point) — **not independently confirmed via the CLI** (`project inspect` doesn't
+expose Git-connection status), so flagging as an observation for the owner to verify in Vercel's
+dashboard (Settings → Git) rather than asserting it outright. If confirmed, future frontend pushes to
+`main` may auto-deploy without a manual `vercel --prod` step.
 
 ## 12. Railway Deployment Status
 
-**Still blocked, reconfirmed again 2026-10-22 (third independent check across three separate passes —
-never assumed stale).** Pending commits now span `9181da9` through `8fd50a8` (office-login route, admin
-rejected on `/login`, suspend-reason field, plus the E2E-test-driven doc updates — no further backend
-code changes beyond what was already pending). Reconfirmed via the same two-part method as before: (1)
-Railway's status page — still "Major Outage", builds disabled for all non-Enterprise tiers; (2) one
-direct `railway up` attempt — same `"Deploys have been paused due to an upstream issue"` response. Only
-one attempt was made this pass, not repeated. The currently-live backend deployment (`d371185a`, from
-commit `ff15926`) remains healthy (`/health` 200) — nothing has regressed, the new office-admin backend
-route simply isn't reachable yet.
+**Still blocked, reconfirmed a fourth time 2026-10-22 — never assumed stale across any pass.** Pending
+commits span `9181da9` through `1a371a4` (office-login route, admin rejected on `/login`, suspend-reason
+field, plus doc-only updates — no further backend code changes beyond what was already pending).
+Reconfirmed this pass via: (1) Railway's status page — forced a hard reload to rule out caching; content
+identical to every prior check ("Major Outage", builds disabled for non-Enterprise tiers); (2) one direct
+`railway up` attempt — same `"Deploys have been paused due to an upstream issue"` response, treated as the
+authoritative ground truth regardless of what the status page shows. Stopped there, as instructed — no
+repeated attempts. The currently-live backend deployment (`d371185a`, from commit `ff15926`) remains
+healthy (`/health` 200) — nothing has regressed, the new office-admin backend route simply isn't reachable
+yet.
 
 **Local verification re-run fresh this pass** (not relying on cached results from prior sessions):
 backend type-check clean, backend build clean, **21/21** backend tests pass. Frontend type-check clean.
