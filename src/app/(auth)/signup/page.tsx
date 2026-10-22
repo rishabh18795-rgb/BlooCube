@@ -1,17 +1,19 @@
 "use client";
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { Button } from "@/Components/ui/Button";
-import { Input } from "@/Components/ui/Input";
-import { Label } from "@/Components/ui/Label";
-import { Alert, AlertDescription } from "@/Components/ui/Alert";
-import { Select, SelectItem, SelectTrigger } from "@/Components/ui/Select";
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, Check, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import AuthShell, { authInput, authLabel, authSubmit } from "@/Components/auth/AuthShell";
+import { CastAvatar } from "@/Components/illustrations/Scenes";
+import type { CastKey } from "@/Components/illustrations/cast";
 import { apiRequest } from "@/lib/apiClient";
 import { useAuth } from "@/hooks/useAuth";
 import { getFriendlyMessage } from "@/lib/errors";
+
+const ROLE_OPTIONS: { value: "brand" | "creator"; title: string; desc: string; cast: CastKey }[] = [
+  { value: "brand", title: "I'm a Brand", desc: "Launch campaigns, discover creators, compare proposals and manage collaborations.", cast: "brandManager" },
+  { value: "creator", title: "I'm a Creator", desc: "Discover opportunities, submit bids and manage brand collaborations.", cast: "beauty" },
+];
 
 const SignupForm: React.FC = () => {
   const router = useRouter();
@@ -190,277 +192,244 @@ const SignupForm: React.FC = () => {
     }
   };
 
+  const passwordHints = [
+    { ok: passwordChecks.length, label: `At least ${passwordRules.minLength} characters` },
+    { ok: passwordChecks.upper, label: "One uppercase letter" },
+    { ok: passwordChecks.lower, label: "One lowercase letter" },
+    { ok: passwordChecks.number, label: "One number" },
+    { ok: passwordChecks.special, label: "One special character" },
+    { ok: passwordChecks.noSpace, label: "No spaces" },
+  ];
+
   return (
-    <section className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-b from-[var(--brand-lavender)] to-white px-2 py-6">
-      {/* Animated glowing background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="hidden" />
-        <div className="hidden" />
-        <div className="hidden" />
-      </div>
+    <AuthShell aside="signup" title="Create your BlooCube account" subtitle="One account for campaigns, bids and collaborations.">
+      {searchParams.get("email") && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700">
+          Email pre-filled from landing page
+        </div>
+      )}
 
-      {/* Subtle grid overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        {/* Role — same `role` state the request sends; preselected from ?role= */}
+        <fieldset>
+          <legend className={authLabel}>I want to join as</legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Account type">
+            {ROLE_OPTIONS.map((opt) => {
+              const selected = role === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-role={opt.value}
+                  onClick={() => setRole(opt.value)}
+                  className={`relative flex items-start gap-3 rounded-2xl border p-3.5 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-indigo/20 ${
+                    selected ? "border-brand-indigo bg-brand-lavender/70 shadow-md shadow-brand-indigo/10" : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <CastAvatar cast={opt.cast} className="h-11 w-11 shrink-0" ring={false} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-brand-navy">{opt.title}</span>
+                    <span className="mt-0.5 block text-xs leading-snug text-slate-500">{opt.desc}</span>
+                  </span>
+                  <span
+                    className={`absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full border ${
+                      selected ? "border-brand-indigo bg-brand-indigo" : "border-slate-300"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {selected && <Check className="h-3 w-3 text-white" />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
 
-      <motion.div
-        initial={{ opacity: 0, y: 25 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 w-full max-w-lg rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60 p-6 sm:p-8"
-      >
-        <div className="hidden" />
-        <div className="hidden" />
-
-        <div className="text-center mb-6">
-          <h2 className="text-4xl font-bold text-slate-900">
-            Create Your Account
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">
-            Join thousands of creators and brands
-          </p>
-          {searchParams.get("email") && (
-            <div className="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <p className="text-sm text-emerald-700">
-                Email pre-filled from landing page
-              </p>
-            </div>
-          )}
+        <div>
+          <label htmlFor="name" className={authLabel}>
+            Full name
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              id="name"
+              type="text"
+              autoComplete="name"
+              placeholder="Your full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={authInput}
+            />
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full Name */}
-          <div>
-            <Label htmlFor="name" className="text-slate-700 text-sm mb-2 block">
-              Full Name
-            </Label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <Input
-                id="name"
-                type="text"
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="pl-10 h-11 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:ring-2 focus:ring-indigo-100"
-              />
-            </div>
+        <div>
+          <label htmlFor="email" className={authLabel}>
+            Email address
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={emailExists === true}
+              aria-describedby="email-status"
+              className={authInput}
+            />
           </div>
-
-          {/* Email */}
-          <div>
-            <Label htmlFor="email" className="text-slate-700 text-sm mb-2 block">
-              Email Address
-            </Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 h-11 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:ring-2 focus:ring-indigo-100"
-              />
-              {email && (
-                <div className="mt-2 text-xs">
-                  {checkingEmail && (
-                    <span className="text-slate-500">Checking email…</span>
-                  )}
-                  {!checkingEmail && emailExists === true && (
-                    <span className="text-red-600">
-                      Email already exists. Try logging in.
-                    </span>
-                  )}
-                  {!checkingEmail && emailExists === false && (
-                    <span className="text-emerald-600">
-                      Email is available.
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+          <div id="email-status" className="mt-1.5 min-h-[1rem] text-xs" aria-live="polite">
+            {email && checkingEmail && <span className="text-slate-500">Checking email…</span>}
+            {email && !checkingEmail && emailExists === true && (
+              <span className="text-red-600">
+                Email already exists.{" "}
+                <Link href="/login" className="font-semibold underline">
+                  Try logging in
+                </Link>
+                .
+              </span>
+            )}
+            {email && !checkingEmail && emailExists === false && <span className="text-emerald-600">Email is available.</span>}
           </div>
+        </div>
 
-          {/* Password + Confirm */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="password" className={authLabel}>
+              Password
+            </label>
             <div className="relative">
-              <Label
-                htmlFor="password"
-                className="text-slate-700 text-sm mb-2 block"
-              >
-                Password
-              </Label>
-              <Lock className="absolute left-3 top-[38px] w-5 h-5 text-slate-500" />
-              <Input
+              <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <input
                 id="password"
                 type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => setPasswordTouched(true)}
-                className="pl-10 pr-10 h-11 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:ring-2 focus:ring-indigo-100"
+                aria-invalid={passwordTouched && !isStrongPassword}
+                aria-describedby="password-rules"
+                className={`${authInput} pr-11`}
               />
-            {passwordTouched || password.length > 0 ? (
-              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className={`flex items-center gap-2 ${passwordChecks.length ? 'text-emerald-600' : 'text-slate-500'}`}>
-                  <span className={`w-2 h-2 rounded-full ${passwordChecks.length ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-                  At least {passwordRules.minLength} characters
-                </div>
-                <div className={`flex items-center gap-2 ${passwordChecks.upper ? 'text-emerald-600' : 'text-slate-500'}`}>
-                  <span className={`w-2 h-2 rounded-full ${passwordChecks.upper ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-                  One uppercase letter (A-Z)
-                </div>
-                <div className={`flex items-center gap-2 ${passwordChecks.lower ? 'text-emerald-600' : 'text-slate-500'}`}>
-                  <span className={`w-2 h-2 rounded-full ${passwordChecks.lower ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-                  One lowercase letter (a-z)
-                </div>
-                <div className={`flex items-center gap-2 ${passwordChecks.number ? 'text-emerald-600' : 'text-slate-500'}`}>
-                  <span className={`w-2 h-2 rounded-full ${passwordChecks.number ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-                  One number (0-9)
-                </div>
-                <div className={`flex items-center gap-2 ${passwordChecks.special ? 'text-emerald-600' : 'text-slate-500'}`}>
-                  <span className={`w-2 h-2 rounded-full ${passwordChecks.special ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-                  One special character (!@#$...)
-                </div>
-                <div className={`flex items-center gap-2 ${passwordChecks.noSpace ? 'text-emerald-600' : 'text-slate-500'}`}>
-                  <span className={`w-2 h-2 rounded-full ${passwordChecks.noSpace ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-                  No spaces
-                </div>
-              </div>
-            ) : null}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo/40"
               >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
-
+          </div>
+          <div>
+            <label htmlFor="confirm" className={authLabel}>
+              Confirm password
+            </label>
             <div className="relative">
-              <Label
-                htmlFor="confirm"
-                className="text-slate-700 text-sm mb-2 block"
-              >
-                Confirm Password
-              </Label>
-              <Lock className="absolute left-3 top-[38px] w-5 h-5 text-slate-500" />
-              <Input
+              <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <input
                 id="confirm"
                 type={showConfirm ? "text" : "password"}
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 onBlur={() => setConfirmTouched(true)}
-                className="pl-10 pr-10 h-11 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:ring-2 focus:ring-indigo-100"
+                aria-invalid={confirmTouched && !passwordsMatch}
+                aria-describedby="confirm-status"
+                className={`${authInput} pr-11`}
               />
-            {(confirmTouched || confirm.length > 0) && (
-              <div className="mt-2 text-xs">
-                <span className={`${passwordsMatch ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
-                </span>
-              </div>
-            )}
               <button
                 type="button"
                 onClick={() => setShowConfirm(!showConfirm)}
-                className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700"
+                aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
+                aria-pressed={showConfirm}
+                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo/40"
               >
-                {showConfirm ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
+            <div id="confirm-status" className="mt-1.5 min-h-[1rem] text-xs" aria-live="polite">
+              {(confirmTouched || confirm.length > 0) && (
+                <span className={passwordsMatch ? "text-emerald-600" : "text-red-600"}>
+                  {passwordsMatch ? "Passwords match" : "Passwords do not match"}
+                </span>
+              )}
+            </div>
           </div>
+        </div>
 
-          {/* Role */}
-          <div>
-            <Label htmlFor="role" className="text-slate-700 text-sm mb-2 block">
-              Select Role
-            </Label>
-            <Select>
-              <SelectTrigger
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="h-11 w-full bg-slate-50 border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-100"
-              >
-                <option value="" disabled className="text-slate-900">
-                  Select your role...
-                </option>
-                <SelectItem value="creator" className="cursor-pointer">
-                  Creator
-                </SelectItem>
-                <SelectItem value="brand" className="cursor-pointer">
-                  Brand
-                </SelectItem>
-              </SelectTrigger>
-            </Select>
+        {(passwordTouched || password.length > 0) && (
+          <ul id="password-rules" className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-xl bg-slate-50 p-3 text-xs">
+            {passwordHints.map((h) => (
+              <li key={h.label} className={`flex items-center gap-1.5 ${h.ok ? "text-emerald-600" : "text-slate-500"}`}>
+                {h.ok ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <span className="mx-1 h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />}
+                {h.label}
+                <span className="sr-only">{h.ok ? " (met)" : " (not met)"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {error && (
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {error}
           </div>
+        )}
+        {message && (
+          <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {message}
+          </div>
+        )}
 
-          {error && (
-            <Alert className="bg-red-50 border-red-200 rounded-xl">
-              <AlertDescription className="text-red-600 text-sm">
-                {error}
-              </AlertDescription>
-            </Alert>
+        <button type="submit" disabled={isLoading || !isStrongPassword || !passwordsMatch} className={authSubmit}>
+          {isLoading ? (
+            <>
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true" />
+              Creating account...
+            </>
+          ) : (
+            <>
+              Create {role === "brand" ? "brand" : "creator"} account <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </>
           )}
+        </button>
 
-          {message && (
-            <Alert className="bg-emerald-50 border-emerald-200 rounded-xl">
-              <AlertDescription className="text-emerald-600 text-sm">
-                {message}
-              </AlertDescription>
-            </Alert>
-          )}
+        {!isLoading && (passwordTouched || password.length > 0) && !isStrongPassword && (
+          <p className="-mt-2 text-center text-xs text-amber-600">Password doesn&apos;t meet the requirements above yet.</p>
+        )}
+        {!isLoading && isStrongPassword && (confirmTouched || confirm.length > 0) && !passwordsMatch && (
+          <p className="-mt-2 text-center text-xs text-amber-600">Confirm password must match the password above.</p>
+        )}
 
-          <Button
-            type="submit"
-            disabled={isLoading || !isStrongPassword || !passwordsMatch}
-            className="w-full h-11 bg-slate-900 hover:bg-slate-800 rounded-xl text-white font-semibold"
-          >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Creating account...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span>Sign Up</span>
-                <ArrowRight className="w-5 h-5" />
-              </div>
-            )}
-          </Button>
+        <p className="text-center text-xs text-slate-500">
+          By creating an account you agree to our{" "}
+          <Link href="/terms" className="font-semibold text-slate-700 underline-offset-2 hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-semibold text-slate-700 underline-offset-2 hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
 
-          {!isLoading && (passwordTouched || password.length > 0) && !isStrongPassword && (
-            <p className="text-xs text-amber-600 text-center -mt-2">
-              Password doesn&apos;t meet the requirements above yet.
-            </p>
-          )}
-          {!isLoading && isStrongPassword && (confirmTouched || confirm.length > 0) && !passwordsMatch && (
-            <p className="text-xs text-amber-600 text-center -mt-2">
-              Confirm password must match the password above.
-            </p>
-          )}
-
-          <p className="mt-5 text-center text-slate-500 text-sm z-50">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors"
-            >
-              Login
-            </Link>
-          </p>
-        </form>
-      </motion.div>
-    </section>
+        <p className="text-center text-sm text-slate-600">
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-brand-indigo hover:text-brand-blue">
+            Log in
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   );
 };
 

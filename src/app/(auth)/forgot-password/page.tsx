@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/Components/ui/Button";
+import Link from "next/link";
+import { Mail } from "lucide-react";
+import AuthShell, { authInput, authLabel, authSubmit } from "@/Components/auth/AuthShell";
 import { apiRequest } from "@/lib/apiClient";
 import { getFriendlyMessage } from "@/lib/errors";
 
@@ -38,31 +39,46 @@ const ForgotPasswordPage: React.FC = () => {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-black px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-md bg-black/70 backdrop-blur-md rounded-3xl p-8 text-white"
-      >
-        <h2 className="text-2xl font-bold mb-6 text-center">Forgot Password</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-white/10 placeholder:text-white/50 focus:outline-none"
-          />
-          <Button type="submit" disabled={isSubmitting} className="w-full mt-2">
-            {isSubmitting ? "Sending..." : "Send Reset Link"}
-          </Button>
-        </form>
-
-        {message && <p className="text-green-400 mt-2 text-center">{message}</p>}
-        {error && <p className="text-red-400 mt-2 text-center">{error}</p>}
-      </motion.div>
-    </section>
+    <AuthShell title="Reset your password" subtitle="Enter the email you signed up with and we'll send a reset link if an account exists.">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <div>
+          <label htmlFor="email" className={authLabel}>
+            Email address
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={authInput}
+            />
+          </div>
+        </div>
+        {message && (
+          <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {message}
+          </div>
+        )}
+        {error && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+        <button type="submit" disabled={isSubmitting} className={authSubmit}>
+          {isSubmitting ? "Sending..." : "Send Reset Link"}
+        </button>
+        <p className="text-center text-sm text-slate-600">
+          Remembered it?{" "}
+          <Link href="/login" className="font-semibold text-brand-indigo hover:text-brand-blue">
+            Back to login
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   );
 };
 

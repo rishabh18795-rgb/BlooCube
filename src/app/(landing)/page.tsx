@@ -7,6 +7,7 @@ import ExploreCreators from "./components/ExploreCreators";
 import AnalyticsPreview from "./components/AnalyticsPreview";
 import PortalPreviews from "./components/PortalPreviews";
 import TrustWorkflow from "./components/TrustWorkflow";
+import CampaignCategories from "./components/CampaignCategories";
 import FAQ from "./components/FAQ";
 import { FAQS } from "./components/faqData";
 import FinalCTA from "./components/FinalCTA";
@@ -46,13 +47,14 @@ export default function LandingPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <Hero />
-      <CapabilityStrip />
       <HowItWorks />
       <BiddingSection />
       <ExploreCreators />
+      <CapabilityStrip />
       <AnalyticsPreview />
       <PortalPreviews />
       <TrustWorkflow />
+      <CampaignCategories />
       <FAQ />
       <FinalCTA />
     </>

@@ -2,12 +2,10 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { Alert, AlertDescription } from "@/Components/ui/Alert";
-import { Button } from "@/Components/ui/Button";
-import { Input } from "@/Components/ui/Input";
-import { Label } from "@/Components/ui/Label";
+import Link from "next/link";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
 import { Checkbox } from "@/Components/ui/Checkbox";
+import AuthShell, { authInput, authLabel, authSubmit } from "@/Components/auth/AuthShell";
 import { apiRequest } from "@/lib/apiClient";
 import { useAuth } from "@/hooks/useAuth";
 import { getFriendlyMessage } from "@/lib/errors";
@@ -48,7 +46,7 @@ const LoginPage: React.FC = () => {
     return null;
   }
 
-  const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
@@ -82,106 +80,106 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-b from-[var(--brand-lavender)] to-white px-4 py-16">
-      <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/60 p-8">
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
-          <p className="text-slate-500 text-sm mt-2">Sign in to continue to your account</p>
+    <AuthShell title="Welcome back to BlooCube" subtitle="Your next campaign or collaboration starts here.">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <div>
+          <label htmlFor="email" className={authLabel}>
+            Email address
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+              aria-invalid={!!error && !email}
+              aria-describedby={error ? "login-error" : undefined}
+              className={authInput}
+            />
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="email" className="text-slate-700 text-sm mb-2 block">
-              Email Address
-            </Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                className="pl-10 h-12 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="password" className="text-slate-700 text-sm mb-2 block">
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-semibold text-slate-700">
               Password
-            </Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                className="pl-10 pr-10 h-12 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="remember"
-                checked={rememberMe}
-                onCheckedChange={(checked: boolean) => setRememberMe(Boolean(checked))}
-                className="border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
-              />
-              <label htmlFor="remember" className="text-sm text-slate-600 cursor-pointer whitespace-nowrap">
-                Remember me
-              </label>
-            </div>
-            <a href="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-700 whitespace-nowrap">
+            </label>
+            <Link href="/forgot-password" className="text-sm font-semibold text-brand-indigo hover:text-brand-blue">
               Forgot password?
-            </a>
+            </Link>
           </div>
-
-          {error && (
-            <Alert className="bg-red-50 border-red-200 rounded-xl">
-              <AlertDescription className="text-red-600 text-sm">{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full h-11 bg-slate-900 hover:bg-slate-800 rounded-xl text-white font-semibold"
-          >
-            {isSubmitting ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Signing in...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span>Sign In</span>
-                <ArrowRight className="w-5 h-5" />
-              </div>
-            )}
-          </Button>
-
-          <p className="mt-4 text-center text-slate-500 text-sm">
-            Don&apos;t have an account?{" "}
-            <a href="/signup" className="text-indigo-600 hover:text-indigo-700 font-semibold">
-              Sign up for free
-            </a>
-          </p>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+              aria-invalid={!!error && password.length < 6}
+              aria-describedby={error ? "login-error" : undefined}
+              className={`${authInput} pr-11`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo/40"
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
-      </div>
-    </section>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="remember"
+            checked={rememberMe}
+            onCheckedChange={(checked: boolean) => setRememberMe(Boolean(checked))}
+            className="border-slate-300 data-[state=checked]:border-brand-indigo data-[state=checked]:bg-brand-indigo"
+          />
+          <label htmlFor="remember" className="cursor-pointer text-sm text-slate-600">
+            Remember me
+          </label>
+        </div>
+
+        {error && (
+          <div id="login-error" role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {error}
+          </div>
+        )}
+
+        <button type="submit" disabled={isSubmitting} className={authSubmit}>
+          {isSubmitting ? (
+            <>
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true" />
+              Signing in...
+            </>
+          ) : (
+            <>
+              Sign in <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </>
+          )}
+        </button>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-center text-sm text-slate-600">
+          New to BlooCube?{" "}
+          <Link href="/signup?role=brand" className="font-semibold text-brand-indigo hover:text-brand-blue">
+            Join as a Brand
+          </Link>{" "}
+          or{" "}
+          <Link href="/signup?role=creator" className="font-semibold text-brand-indigo hover:text-brand-blue">
+            Join as a Creator
+          </Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 };
 

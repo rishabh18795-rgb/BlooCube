@@ -19,7 +19,7 @@ type CreatorCard = {
   platforms: string[];
 };
 
-const NICHES = ["All", "Fashion", "Beauty", "Lifestyle", "Tech", "Fitness", "Food", "Travel"];
+const NICHES = ["All", "Fashion", "Beauty", "Lifestyle", "Tech", "Fitness", "Food", "Travel", "Gaming"];
 
 function FindCreatorsContent() {
   const searchParams = useSearchParams();

@@ -21,7 +21,7 @@ type CreatorCard = {
   platforms: string[];
 };
 
-const NICHES = ["All", "Fashion", "Beauty", "Lifestyle", "Tech", "Fitness", "Food", "Travel"];
+const NICHES = ["All", "Fashion", "Beauty", "Lifestyle", "Tech", "Fitness", "Food", "Travel", "Gaming"];
 
 export default function ExploreCreators() {
   const [creators, setCreators] = useState<CreatorCard[]>([]);

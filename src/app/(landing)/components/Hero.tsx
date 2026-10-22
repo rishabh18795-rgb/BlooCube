@@ -30,7 +30,7 @@ export default function Hero() {
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-slate-600">
             Discover creators, launch campaigns, compare competitive bids, and manage collaborations through one
-            intelligent influencer marketing marketplace.
+            intelligent marketplace.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">

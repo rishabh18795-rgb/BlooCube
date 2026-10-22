@@ -11,7 +11,7 @@ const CAPABILITIES = [
 
 export default function CapabilityStrip() {
   return (
-    <section aria-label="Platform capabilities" className="relative z-10 -mt-8 px-4 sm:px-6">
+    <section aria-label="Platform capabilities" className="bg-white px-4 pb-4 sm:px-6">
       <div className="mx-auto max-w-7xl rounded-2xl border border-slate-200/80 bg-white/90 p-2 shadow-[0_20px_50px_-30px_rgba(11,16,38,0.35)] backdrop-blur">
         <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-5">
           {CAPABILITIES.map(({ icon: Icon, label, sub }, i) => (
