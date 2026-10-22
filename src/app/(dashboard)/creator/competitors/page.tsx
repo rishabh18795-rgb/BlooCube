@@ -23,7 +23,6 @@ interface Competitor {
   growthRate: number;
   category: string;
   verified: boolean;
-  avatar: string;
   profileUrl?: string;
   lastAnalyzed?: string;
   analysisId?: string;
@@ -158,7 +157,6 @@ const CompetitorAnalysisPage = () => {
             growthRate: 0,
             category: '—',
             verified: !!c.verified,
-            avatar: '/api/placeholder/60/60',
             profileUrl: c.profile_url || c.profile_url,
             lastAnalyzed: d?.createdAt || d?.ai_metadata?.generated_at || undefined,
             analysisId: d?._id
