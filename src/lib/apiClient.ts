@@ -260,6 +260,13 @@ export async function apiRequest<T = unknown>(path: string, init: RequestInit = 
             // Clear user data cookie
             const { cookieAuthUtils } = await import('@/lib/cookieAuth');
             cookieAuthUtils.clearAuth();
+            // Also clear the request cache, same as the explicit logout
+            // button (performLogout) does — otherwise a stale cached
+            // /api/profile/me (or any other cached GET) from this session
+            // could be served to whoever logs in next on this tab, on the
+            // rare path below where no redirect happens (already on a
+            // public route).
+            cacheUtils.clearAll();
             // Trigger auth sync to update UI
             window.dispatchEvent(new CustomEvent('authChange'));
             // Only redirect if not already on login page or landing page
