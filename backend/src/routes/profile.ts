@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { prisma } from '../db';
 import { ok, fail } from '../utils/responses';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { csv } from '../utils/mappers';
+import { clearAuthCookies } from '../utils/cookies';
+import { AVATAR_DIR, AVATAR_URL_PREFIX, ALLOWED_AVATAR_MIME_TO_EXT, deleteAvatarFile } from '../services/avatarStorage';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -22,21 +26,32 @@ async function buildUserProfile(userId: string) {
     updatedAt: user.updatedAt.toISOString(),
   };
 
+  const commonProfile = {
+    phone: user.phone || '',
+    address: user.address || '',
+    gender: 'prefer_not_to_say' as const,
+    language: 'en',
+    timezone: 'Asia/Kolkata',
+    preferences: {
+      emailNotifications: user.emailNotifications,
+      pushNotifications: user.pushNotifications,
+      smsNotifications: user.smsNotifications,
+      marketingEmails: user.marketingEmails,
+      profileVisibility: 'public' as const,
+    },
+  };
+
   if (user.creatorProfile) {
     const cp = user.creatorProfile;
     return {
       ...base,
       profile: {
+        ...commonProfile,
         bio: cp.bio || '',
         avatar_url: user.avatarUrl || '',
-        phone: '',
         location: cp.location || '',
         website: '',
-        gender: 'prefer_not_to_say',
-        language: 'en',
-        timezone: 'Asia/Kolkata',
         social_links: {},
-        preferences: { emailNotifications: true, pushNotifications: true, smsNotifications: false, marketingEmails: false, profileVisibility: 'public' },
       },
       creator: {
         id: cp.id,
@@ -58,16 +73,12 @@ async function buildUserProfile(userId: string) {
     return {
       ...base,
       profile: {
+        ...commonProfile,
         bio: bp.description || '',
-        avatar_url: bp.logoUrl || '',
-        phone: '',
+        avatar_url: user.avatarUrl || bp.logoUrl || '',
         location: bp.location || '',
         website: bp.website || '',
-        gender: 'prefer_not_to_say',
-        language: 'en',
-        timezone: 'Asia/Kolkata',
         social_links: { instagram: bp.instagram || undefined, youtube: bp.youtube || undefined },
-        preferences: { emailNotifications: true, pushNotifications: true, smsNotifications: false, marketingEmails: false, profileVisibility: 'public' },
       },
       brand: {
         id: bp.id,
@@ -84,7 +95,7 @@ async function buildUserProfile(userId: string) {
     };
   }
 
-  return base;
+  return { ...base, profile: { ...commonProfile, bio: '', avatar_url: user.avatarUrl || '', location: '', website: '', social_links: {} } };
 }
 
 router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
@@ -93,39 +104,55 @@ router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   return ok(res, { user: profile });
 });
 
-router.put('/account', requireAuth, async (req: AuthedRequest, res) => {
-  const { name, profile } = req.body || {};
-  const data: Record<string, unknown> = {};
-  if (name) data.name = name;
-  if (Object.keys(data).length) await prisma.user.update({ where: { id: req.userId! }, data });
+async function applyProfileUpdate(userId: string, body: Record<string, unknown>) {
+  const { name, profile } = (body || {}) as { name?: string; profile?: Record<string, unknown> };
+  const userData: Record<string, unknown> = {};
+  if (typeof name === 'string' && name.trim()) userData.name = name.trim();
+  if (profile && typeof profile.phone === 'string') userData.phone = profile.phone;
+  if (profile && typeof profile.address === 'string') userData.address = profile.address;
+  const preferences = profile?.preferences as Record<string, unknown> | undefined;
+  if (preferences) {
+    if (typeof preferences.emailNotifications === 'boolean') userData.emailNotifications = preferences.emailNotifications;
+    if (typeof preferences.pushNotifications === 'boolean') userData.pushNotifications = preferences.pushNotifications;
+    if (typeof preferences.smsNotifications === 'boolean') userData.smsNotifications = preferences.smsNotifications;
+    if (typeof preferences.marketingEmails === 'boolean') userData.marketingEmails = preferences.marketingEmails;
+  }
+  if (Object.keys(userData).length) await prisma.user.update({ where: { id: userId }, data: userData });
 
   if (profile) {
-    const creator = await prisma.creatorProfile.findUnique({ where: { userId: req.userId! } });
+    const socialLinks = profile.social_links as Record<string, unknown> | undefined;
+    const creator = await prisma.creatorProfile.findUnique({ where: { userId } });
     if (creator) {
       await prisma.creatorProfile.update({
-        where: { userId: req.userId! },
+        where: { userId },
         data: {
-          bio: profile.bio ?? undefined,
-          location: profile.location ?? undefined,
+          bio: (profile.bio as string) ?? undefined,
+          location: (profile.location as string) ?? undefined,
         },
       });
     }
-    const brand = await prisma.brandProfile.findUnique({ where: { userId: req.userId! } });
+    const brand = await prisma.brandProfile.findUnique({ where: { userId } });
     if (brand) {
       await prisma.brandProfile.update({
-        where: { userId: req.userId! },
+        where: { userId },
         data: {
-          description: profile.bio ?? undefined,
-          location: profile.location ?? undefined,
-          website: profile.website ?? undefined,
-          instagram: profile.social_links?.instagram ?? undefined,
-          youtube: profile.social_links?.youtube ?? undefined,
+          description: (profile.bio as string) ?? undefined,
+          location: (profile.location as string) ?? undefined,
+          website: (profile.website as string) ?? undefined,
+          instagram: (socialLinks?.instagram as string) ?? undefined,
+          youtube: (socialLinks?.youtube as string) ?? undefined,
         },
       });
     }
   }
 
-  const updated = await buildUserProfile(req.userId!);
+  return buildUserProfile(userId);
+}
+
+// Frontend calls PUT /me; /account is kept as an alias for any existing callers.
+router.put(['/me', '/account'], requireAuth, async (req: AuthedRequest, res) => {
+  const updated = await applyProfileUpdate(req.userId!, req.body);
+  if (!updated) return fail(res, 'User not found', 404);
   return ok(res, { user: updated });
 });
 
@@ -171,6 +198,84 @@ router.put('/brand', requireAuth, async (req: AuthedRequest, res) => {
     },
   });
   return ok(res, { brand: updated });
+});
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, AVATAR_DIR),
+    filename: (req, file, cb) => {
+      const ext = ALLOWED_AVATAR_MIME_TO_EXT[file.mimetype];
+      const userId = (req as AuthedRequest).userId;
+      cb(null, `${userId}-${crypto.randomBytes(8).toString('hex')}.${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_AVATAR_MIME_TO_EXT[file.mimetype]) {
+      return cb(new Error('UNSUPPORTED_FILE_TYPE'));
+    }
+    cb(null, true);
+  },
+});
+
+function handleAvatarUpload(req: AuthedRequest, res: import('express').Response, next: import('express').NextFunction) {
+  avatarUpload.single('avatar')(req, res, (err: unknown) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return fail(res, 'Image must be 5MB or smaller', 413);
+    }
+    if (err instanceof Error && err.message === 'UNSUPPORTED_FILE_TYPE') {
+      return fail(res, 'Only JPG, PNG, or GIF images are allowed', 415);
+    }
+    return fail(res, 'Upload failed', 400);
+  });
+}
+
+// Authorization: only req.userId from the authenticated session is ever
+// used to decide whose avatar is written — no client-supplied user id is
+// accepted anywhere in this route, so a user cannot touch another
+// account's avatar by editing request parameters.
+router.post('/avatar', requireAuth, handleAvatarUpload, async (req: AuthedRequest, res) => {
+  if (!req.file) return fail(res, 'No image file provided', 422);
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId! } });
+  const avatarUrl = `${AVATAR_URL_PREFIX}${req.file.filename}`;
+
+  deleteAvatarFile(user.avatarUrl);
+  await prisma.user.update({ where: { id: req.userId! }, data: { avatarUrl } });
+
+  const brand = await prisma.brandProfile.findUnique({ where: { userId: req.userId! } });
+  if (brand) {
+    await prisma.brandProfile.update({ where: { userId: req.userId! }, data: { logoUrl: avatarUrl } });
+  }
+
+  return ok(res, { avatar_url: avatarUrl });
+});
+
+router.delete('/avatar', requireAuth, async (req: AuthedRequest, res) => {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId! } });
+  deleteAvatarFile(user.avatarUrl);
+  await prisma.user.update({ where: { id: req.userId! }, data: { avatarUrl: null } });
+
+  const brand = await prisma.brandProfile.findUnique({ where: { userId: req.userId! } });
+  if (brand) {
+    await prisma.brandProfile.update({ where: { userId: req.userId! }, data: { logoUrl: null } });
+  }
+
+  return ok(res, { avatar_url: '' });
+});
+
+router.delete('/account', requireAuth, async (req: AuthedRequest, res) => {
+  const { password } = (req.body || {}) as { password?: string };
+  if (!password) return fail(res, 'Password is required to delete your account', 422);
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId! } });
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return fail(res, 'Incorrect password', 401);
+
+  await prisma.user.update({ where: { id: user.id }, data: { isActive: false, deletedAt: new Date() } });
+  clearAuthCookies(res);
+  return ok(res, { deleted: true });
 });
 
 router.put('/change-password', requireAuth, async (req: AuthedRequest, res) => {

@@ -101,6 +101,12 @@ model User {
   isActive      Boolean   @default(true)
   isVerified    Boolean   @default(true)
   avatarUrl     String?
+  phone         String?
+  address       String?
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+  smsNotifications   Boolean @default(false)
+  marketingEmails    Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?

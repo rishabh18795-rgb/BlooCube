@@ -58,7 +58,7 @@ const nextConfig: NextConfig = {
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '5000',
+        port: '5050',
         pathname: '/uploads/**',
       },
       {
@@ -94,10 +94,18 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const backendUrl = process.env.BACKEND_API_URL;
     if (!backendUrl) return [];
+    const base = backendUrl.replace(/\/+$/, '');
     return [
       {
         source: '/api/:path*',
-        destination: `${backendUrl.replace(/\/+$/, '')}/api/:path*`,
+        destination: `${base}/api/:path*`,
+      },
+      // Uploaded avatars are served from the backend's root (not under
+      // /api/*) — see backend/src/index.ts. Without this, getAvatarUrl()'s
+      // relative "/uploads/avatars/..." URLs would 404 on this origin.
+      {
+        source: '/uploads/:path*',
+        destination: `${base}/uploads/:path*`,
       },
     ];
   },
