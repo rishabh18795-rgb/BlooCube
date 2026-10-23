@@ -425,6 +425,16 @@ export async function apiRequest<T = unknown>(path: string, init: RequestInit = 
         } else if (basePath.includes('/conversations')) {
           cacheUtils.clearPattern('/api/conversations');
           console.log(`🗑️ Auto-invalidated cache for: /api/conversations`);
+        } else if (basePath.includes('/profile')) {
+          // Avatar upload/remove, profile save, and delete-account all mutate
+          // GET /api/profile/me, which is cached for 10 minutes (see
+          // getCacheTTL). Without this, a refreshProfile() call right after
+          // a successful mutation serves the stale pre-mutation response —
+          // the UI shows a success toast but the change never visibly
+          // appears until the cache naturally expires or a full page reload
+          // resets this in-memory cache.
+          cacheUtils.clearPattern('/api/profile');
+          console.log(`🗑️ Auto-invalidated cache for: /api/profile`);
         }
       }
 
