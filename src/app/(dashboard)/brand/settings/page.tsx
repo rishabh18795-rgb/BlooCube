@@ -40,6 +40,9 @@ export default function BrandSettingsPage() {
     type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: UserIcon },
@@ -140,6 +143,26 @@ export default function BrandSettingsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Delete account
+  const deleteAccount = async () => {
+    try {
+      setDeleting(true);
+      const response = await profileApi.deleteAccount({ password: deletePassword });
+      if (response.success) {
+        setNotification({ type: 'success', message: 'Account deleted successfully. You will be redirected to login.' });
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
+    } catch (error: any) {
+      setNotification({ type: 'error', message: error.message || 'Failed to delete account' });
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+      setDeletePassword('');
     }
   };
 
@@ -546,9 +569,10 @@ export default function BrandSettingsPage() {
                       </>
                     )}
                 </button>
-                <button 
+                <button
                   className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-sm hover:from-red-600 hover:to-red-700 transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none w-full sm:w-auto justify-center"
                   disabled={saving}
+                  onClick={() => setShowDeleteModal(true)}
                 >
                   <TrashIcon className="w-4 h-4" />
                   Delete Account
@@ -596,6 +620,47 @@ export default function BrandSettingsPage() {
           </div>
         </div>
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4">
+              <ExclamationTriangleIcon className="text-red-600 mr-2 w-6 h-6" />
+              <h3 className="text-lg font-semibold text-gray-900">Delete Account</h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              This action cannot be undone. This will permanently deactivate your account.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Enter your password to confirm
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder="••••••••••••"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeletePassword(''); }}
+                className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteAccount}
+                disabled={deleting || !deletePassword}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
