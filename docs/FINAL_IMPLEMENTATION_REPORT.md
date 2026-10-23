@@ -385,6 +385,53 @@ pentest beyond reviewing the new routes themselves, re-testing every pre-existin
 checks in §12, and the office-admin dashboard's authenticated screens (route is live, UI not re-walked with
 real credentials).
 
+## 20. Avatar/Profile "Success but nothing visibly changes" — Cache Bug (2026-10-24, second pass)
+
+A new report said avatar upload shows "Profile picture updated successfully!" but the photo never visibly
+replaces the fallback initial. Re-verifying §19's fix wasn't enough on its own — that pass's testing always
+used a full page reload (`navigate()`) immediately after each mutation, which, as a side effect, wipes the
+frontend's in-memory API response cache. That accidentally hid this bug from every prior test.
+
+**Root cause**: `src/lib/apiClient.ts` caches `GET` responses client-side and has an auto-invalidation list
+that clears the relevant cache entries after a mutation — but it only had branches for
+`/posts`, `/campaigns`, `/bids`, `/analytics`, `/engagement`, and `/conversations`. There was no `/profile`
+branch. `GET /api/profile/me` is cached for **10 minutes**. Every profile mutation (avatar upload/remove,
+profile save, delete-account) calls `refreshProfile()` right after succeeding specifically to update the
+UI — but that call was served the stale, pre-mutation cache entry instead of hitting the network. The
+mutation genuinely succeeded (confirmed by the toast and by the database); only the subsequent "go read it
+back to update the screen" step was silently serving old data.
+
+**Reproduced live, twice, with direct network evidence** (not inferred): logged into a fresh QA account on
+production, loaded `/creator/settings` once (priming the cache), then — with **no further page reload** —
+typed into the phone field and clicked "Save Changes". Network panel showed exactly: `GET /profile/me`,
+`GET /profile/me` (page's two independent fetches on mount), `PUT /profile/me` — and then **nothing**. No
+`GET /profile/me` followed the successful `PUT`, proving the refresh was cache-short-circuited rather than
+actually hitting the server.
+
+**Fix**: added the missing `/profile` branch to the same existing auto-invalidation mechanism (`src/lib/
+apiClient.ts`) — the same pattern already used for every other resource, no new mechanism introduced.
+
+**Verified fixed, same method, before and after**:
+- Locally (dev server, fresh QA account): before the fix, the exact repro above showed no follow-up `GET`;
+  after the fix, a fresh `GET /profile/me` fires immediately after the `PUT`.
+- **In production** after deploying (frontend-only change; no backend redeploy needed): same repro on
+  `https://bloocube.com/creator/settings` with a new QA account — `PUT /profile/me` now immediately
+  followed by fresh `GET /profile/me` calls, confirmed via the browser's network panel. The underlying
+  mechanism (`includes('/profile')` on the mutation's base path) covers avatar upload/remove, profile save,
+  and delete-account identically, since they all share the same `/api/profile/*` prefix — the avatar
+  symptom specifically was not re-reproduced via an actual file-picker click (browser automation here
+  cannot script a native file input), but the shared root cause and shared code path make this the same fix
+  for both the originally-reported avatar symptom and the profile-save field.
+
+**Secondary finding, not fixed this pass**: while investigating, found that deleting/deactivating an
+account does not revoke an already-issued access token — `requireAuth` only checks the JWT's signature and
+expiry, not the user's current `isActive`/`deletedAt` state in the database. A session that was active at
+the moment of "Delete Account" stays usable for the rest of that access token's lifetime (15 minutes) even
+though login is now correctly blocked and the account should be gone. This is a common, often-accepted
+tradeoff for stateless JWTs (no DB lookup needed on every request), but it does mean "delete account" does
+not mean "immediately logged out everywhere" — worth a product decision on whether that's acceptable for
+launch, not something fixed silently as part of this pass.
+
 ---
 
 **Portal entry points**: `https://bloocube.com/login` (brand/creator) ·
