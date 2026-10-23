@@ -43,6 +43,8 @@ export default function BrandSettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '' });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: UserIcon },
@@ -143,6 +145,26 @@ export default function BrandSettingsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Change password
+  const changePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword) {
+      setNotification({ type: 'error', message: 'Please fill in both password fields' });
+      return;
+    }
+    try {
+      setChangingPassword(true);
+      const response = await profileApi.changePassword(passwordData);
+      if (response.success) {
+        setNotification({ type: 'success', message: 'Password changed successfully!' });
+        setPasswordData({ currentPassword: '', newPassword: '' });
+      }
+    } catch (error: any) {
+      setNotification({ type: 'error', message: error.message || 'Failed to change password' });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -389,8 +411,29 @@ export default function BrandSettingsPage() {
           Update your account password to keep your account secure
         </p>
 
-        <button className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-sm hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 w-full sm:w-auto">
-          Change Password
+        <div className="w-full sm:max-w-xs space-y-3 text-left">
+          <input
+            type="password"
+            value={passwordData.currentPassword}
+            onChange={(e) => setPasswordData((prev) => ({ ...prev, currentPassword: e.target.value }))}
+            placeholder="Current password"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <input
+            type="password"
+            value={passwordData.newPassword}
+            onChange={(e) => setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))}
+            placeholder="New password"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <button
+          onClick={changePassword}
+          disabled={changingPassword || !passwordData.currentPassword || !passwordData.newPassword}
+          className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-sm hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {changingPassword ? 'Changing...' : 'Change Password'}
         </button>
 
       </div>
