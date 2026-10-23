@@ -150,6 +150,39 @@ test('POST /api/profile/avatar for a brand also updates the brand logoUrl', asyn
   fs.unlinkSync(path.join(AVATAR_DIR, path.basename(res.body.data.avatar_url)));
 });
 
+function tinyJpeg(): Buffer {
+  return Buffer.from(
+    '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=',
+    'base64'
+  );
+}
+
+function tinyGif(): Buffer {
+  return Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+}
+
+test('POST /api/profile/avatar accepts a valid JPG', async () => {
+  const res = await request(app)
+    .post('/api/profile/avatar')
+    .set('Cookie', creatorCookie)
+    .attach('avatar', tinyJpeg(), { filename: 'avatar.jpg', contentType: 'image/jpeg' });
+
+  assert.equal(res.status, 200);
+  assert.match(res.body.data.avatar_url, /^\/uploads\/avatars\/.+\.jpg$/);
+  fs.unlinkSync(path.join(AVATAR_DIR, path.basename(res.body.data.avatar_url)));
+});
+
+test('POST /api/profile/avatar accepts a valid GIF', async () => {
+  const res = await request(app)
+    .post('/api/profile/avatar')
+    .set('Cookie', creatorCookie)
+    .attach('avatar', tinyGif(), { filename: 'avatar.gif', contentType: 'image/gif' });
+
+  assert.equal(res.status, 200);
+  assert.match(res.body.data.avatar_url, /^\/uploads\/avatars\/.+\.gif$/);
+  fs.unlinkSync(path.join(AVATAR_DIR, path.basename(res.body.data.avatar_url)));
+});
+
 test('POST /api/profile/avatar rejects a non-image file', async () => {
   const res = await request(app)
     .post('/api/profile/avatar')
@@ -158,6 +191,22 @@ test('POST /api/profile/avatar rejects a non-image file', async () => {
 
   assert.equal(res.status, 415);
   assert.equal(res.body.success, false);
+});
+
+test('POST /api/profile/avatar rejects content whose real bytes are not actually an image, even with a spoofed image Content-Type', async () => {
+  const res = await request(app)
+    .post('/api/profile/avatar')
+    .set('Cookie', creatorCookie)
+    .attach('avatar', Buffer.from('<html><script>alert(1)</script></html>'), {
+      filename: 'avatar.png',
+      contentType: 'image/png',
+    });
+
+  assert.equal(res.status, 415);
+  assert.equal(res.body.success, false);
+  // Must never have been written to disk under any name.
+  const files = fs.readdirSync(AVATAR_DIR).filter((f) => f.startsWith(creatorUserId));
+  assert.equal(files.length, 0);
 });
 
 test('POST /api/profile/avatar rejects a file over 5MB', async () => {

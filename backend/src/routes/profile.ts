@@ -6,8 +6,10 @@ import { ok, fail } from '../utils/responses';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { csv } from '../utils/mappers';
 import { clearAuthCookies } from '../utils/cookies';
-import { AVATAR_DIR, AVATAR_URL_PREFIX, ALLOWED_AVATAR_MIME_TO_EXT, deleteAvatarFile } from '../services/avatarStorage';
+import { AVATAR_DIR, AVATAR_URL_PREFIX, ALLOWED_AVATAR_MIME_TO_EXT, sniffAvatarExt, deleteAvatarFile } from '../services/avatarStorage';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
@@ -201,16 +203,15 @@ router.put('/brand', requireAuth, async (req: AuthedRequest, res) => {
 });
 
 const avatarUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, AVATAR_DIR),
-    filename: (req, file, cb) => {
-      const ext = ALLOWED_AVATAR_MIME_TO_EXT[file.mimetype];
-      const userId = (req as AuthedRequest).userId;
-      cb(null, `${userId}-${crypto.randomBytes(8).toString('hex')}.${ext}`);
-    },
-  }),
+  // Held in memory only long enough to sniff its real content and, if
+  // valid, write it to disk ourselves below — never written to disk under
+  // a client-chosen name/type before that check happens.
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
+    // A cheap first-pass rejection on the declared type — still fully
+    // re-validated against the actual bytes below, since this alone can't
+    // be trusted.
     if (!ALLOWED_AVATAR_MIME_TO_EXT[file.mimetype]) {
       return cb(new Error('UNSUPPORTED_FILE_TYPE'));
     }
@@ -238,8 +239,18 @@ function handleAvatarUpload(req: AuthedRequest, res: import('express').Response,
 router.post('/avatar', requireAuth, handleAvatarUpload, async (req: AuthedRequest, res) => {
   if (!req.file) return fail(res, 'No image file provided', 422);
 
+  // The declared Content-Type (checked above) is never sufficient on its
+  // own — this sniffs the actual bytes and is what decides both whether
+  // the upload is accepted and what extension the stored file gets.
+  const ext = sniffAvatarExt(req.file.buffer);
+  if (!ext) {
+    return fail(res, 'Only JPG, PNG, or GIF images are allowed', 415);
+  }
+
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId! } });
-  const avatarUrl = `${AVATAR_URL_PREFIX}${req.file.filename}`;
+  const filename = `${req.userId}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(AVATAR_DIR, filename), req.file.buffer);
+  const avatarUrl = `${AVATAR_URL_PREFIX}${filename}`;
 
   deleteAvatarFile(user.avatarUrl);
   await prisma.user.update({ where: { id: req.userId! }, data: { avatarUrl } });
