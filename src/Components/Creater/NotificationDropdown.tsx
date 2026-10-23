@@ -3,13 +3,14 @@
 
 
 import React, { useState } from 'react';
-import { 
-  Bell, 
-  Check, 
-  Trash2, 
-  AlertCircle, 
-  Info, 
-  CheckCircle, 
+import { useRouter } from 'next/navigation';
+import {
+  Bell,
+  Check,
+  Trash2,
+  AlertCircle,
+  Info,
+  CheckCircle,
 
   AlertTriangle,
   X,
@@ -23,6 +24,7 @@ interface NotificationDropdownProps {
 
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ className = '' }) => {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +126,16 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ className =
   const toggleDropdown = () => setIsOpen(!isOpen);
   const closeDropdown = () => setIsOpen(false);
 
+  const handleNotificationClick = (notification: { _id: string; isRead: boolean; link?: string }) => {
+    if (!notification.isRead) {
+      markAsRead(notification._id);
+    }
+    if (notification.link) {
+      closeDropdown();
+      router.push(notification.link);
+    }
+  };
+
   return (
     <div ref={dropdownRef} className={`relative ${className}`}>
       {/* Notification Bell Button */}
@@ -212,9 +224,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ className =
                 {notifications.map((notification) => (
                   <div
                     key={notification._id}
+                    onClick={() => handleNotificationClick(notification)}
                     className={`p-4 hover:bg-gray-50 transition-colors duration-200 ${
                       !notification.isRead ? "bg-blue-50/50" : ""
-                    }`}
+                    } ${notification.link ? "cursor-pointer" : ""}`}
                   >
                     <div className="flex items-start space-x-3">
                       {/* Type Icon */}
@@ -253,7 +266,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ className =
                           <div className="flex items-center space-x-1">
                             {!notification.isRead && (
                               <button
-                                onClick={() => markAsRead(notification._id)}
+                                onClick={(e) => { e.stopPropagation(); markAsRead(notification._id); }}
                                 className="p-2 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors duration-200"
                                 title="Mark as read"
                               >
@@ -262,9 +275,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ className =
                             )}
 
                             <button
-                              onClick={() =>
-                                deleteNotification(notification._id)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNotification(notification._id);
+                              }}
                               className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
                               title="Delete notification"
                             >

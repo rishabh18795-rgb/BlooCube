@@ -20,13 +20,14 @@ const TYPE_MAP: Record<string, string> = {
   WITHDRAWAL_COMPLETED: 'payment_received',
 };
 
-function toNotificationJson(n: { id: string; type: string; title: string; body: string; readAt: Date | null; createdAt: Date }) {
+function toNotificationJson(n: { id: string; type: string; title: string; body: string; link: string | null; readAt: Date | null; createdAt: Date }) {
   return {
     _id: n.id,
     title: n.title,
     message: n.body,
     type: TYPE_MAP[n.type] || 'system_alert',
     priority: 'medium',
+    link: n.link || undefined,
     isRead: !!n.readAt,
     readAt: n.readAt ? n.readAt.toISOString() : undefined,
     createdAt: n.createdAt.toISOString(),

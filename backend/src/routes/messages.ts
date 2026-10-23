@@ -72,8 +72,11 @@ router.post('/:id/messages', requireAuth, async (req: AuthedRequest, res) => {
   const message = await prisma.message.create({ data: { conversationId: conversation.id, senderId: req.userId!, body: String(body).trim() }, include: { sender: true } });
   await prisma.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });
 
-  const recipientId = conversation.creatorUserId === req.userId ? conversation.brandUserId : conversation.creatorUserId;
-  await NotificationService.send(recipientId, 'NEW_MESSAGE', 'New message', body.slice(0, 80));
+  const recipientIsBrand = conversation.creatorUserId === req.userId;
+  const recipientId = recipientIsBrand ? conversation.brandUserId : conversation.creatorUserId;
+  const basePath = recipientIsBrand ? '/brand/messages' : '/creator/messages';
+  const link = conversation.campaignId ? `${basePath}?campaignId=${conversation.campaignId}` : basePath;
+  await NotificationService.send(recipientId, 'NEW_MESSAGE', 'New message', body.slice(0, 80), link);
 
   return ok(res, { message: { _id: message.id, body: message.body, sender: { _id: message.sender.id, name: message.sender.name }, isMine: true, createdAt: message.createdAt.toISOString() } }, 201);
 });

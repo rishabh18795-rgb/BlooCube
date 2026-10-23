@@ -402,6 +402,7 @@ model Notification {
   type      NotificationType
   title     String
   body      String
+  link      String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
 

@@ -57,7 +57,7 @@ router.post('/:id/submissions', requireAuth, async (req: AuthedRequest, res) => 
 
   const submission = await prisma.contentSubmission.create({ data: { collaborationId: collaboration.id, contentUrl, note } });
   await prisma.collaboration.update({ where: { id: collaboration.id }, data: { status: 'submitted' } });
-  await NotificationService.send(collaboration.campaign.brand.userId, 'CONTENT_APPROVED', 'New content submitted', `A creator submitted content for "${collaboration.campaign.title}"`);
+  await NotificationService.send(collaboration.campaign.brand.userId, 'CONTENT_APPROVED', 'New content submitted', `A creator submitted content for "${collaboration.campaign.title}"`, '/brand/collaborations');
 
   return ok(res, { submission: { _id: submission.id, contentUrl: submission.contentUrl, status: submission.status } }, 201);
 });

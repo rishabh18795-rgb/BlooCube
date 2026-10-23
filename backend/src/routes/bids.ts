@@ -58,7 +58,7 @@ router.post('/', requireAuth, requireRole('CREATOR'), async (req: AuthedRequest,
     include: { campaign: true, creator: { include: { user: true } } },
   });
 
-  await NotificationService.send(campaign.brand.userId, 'NEW_APPLICATION', 'New campaign application', `A creator applied to "${campaign.title}"`);
+  await NotificationService.send(campaign.brand.userId, 'NEW_APPLICATION', 'New campaign application', `A creator applied to "${campaign.title}"`, '/brand/bids');
 
   return ok(res, { bid: applicationToBidJson(application) }, 201);
 });

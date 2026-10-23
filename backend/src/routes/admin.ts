@@ -136,7 +136,7 @@ router.put('/withdrawals/:id/status', async (req: AuthedRequest, res) => {
   if (withdrawal.status === 'COMPLETED') {
     const wallet = await prisma.wallet.findUnique({ where: { id: withdrawal.walletId } });
     if (wallet) {
-      await (await import('../services/notificationService')).NotificationService.send(wallet.userId, 'WITHDRAWAL_COMPLETED', 'Withdrawal completed', `Your withdrawal of ₹${withdrawal.amount.toLocaleString('en-IN')} has been processed.`);
+      await (await import('../services/notificationService')).NotificationService.send(wallet.userId, 'WITHDRAWAL_COMPLETED', 'Withdrawal completed', `Your withdrawal of ₹${withdrawal.amount.toLocaleString('en-IN')} has been processed.`, '/creator/payments');
     }
   }
   return ok(res, { withdrawal: { _id: withdrawal.id, status: withdrawal.status.toLowerCase() } });

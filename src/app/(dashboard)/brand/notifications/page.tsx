@@ -1,6 +1,7 @@
 "use client";
 import { useState } from 'react';
-import { 
+import { useRouter } from 'next/navigation';
+import {
   BellIcon, 
   CheckIcon, 
   XMarkIcon, 
@@ -16,6 +17,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { type Notification } from '@/lib/notificationService';
 
 export default function BrandNotificationsPage() {
+  const router = useRouter();
   const { user, isLoading } = useAuth();
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('');
@@ -143,6 +145,15 @@ export default function BrandNotificationsPage() {
     }
   };
 
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.isRead) {
+      handleMarkAsRead(notification._id);
+    }
+    if (notification.link) {
+      router.push(notification.link);
+    }
+  };
+
   const handleRefresh = async () => {
     try {
       await refreshNotifications();
@@ -234,11 +245,12 @@ export default function BrandNotificationsPage() {
           notifications.map(notification => (
             <div
               key={notification._id}
+              onClick={() => handleNotificationClick(notification)}
               className={`p-4 rounded-lg border transition-all duration-200 ${
-                notification.isRead 
-                  ? 'bg-white border-gray-200' 
+                notification.isRead
+                  ? 'bg-white border-gray-200'
                   : `${getNotificationBgColor(notification.type, notification.priority)} border-l-4`
-              }`}
+              } ${notification.link ? 'cursor-pointer' : ''}`}
             >
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 mt-1">
@@ -295,16 +307,16 @@ export default function BrandNotificationsPage() {
                       
                       {!notification.isRead && (
                         <button
-                          onClick={() => handleMarkAsRead(notification._id)}
+                          onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notification._id); }}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                           title="Mark as read"
                         >
                           <CheckIcon className="w-4 h-4" />
                         </button>
                       )}
-                      
+
                       <button
-                        onClick={() => handleDeleteNotification(notification._id)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteNotification(notification._id); }}
                         className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="Delete notification"
                       >

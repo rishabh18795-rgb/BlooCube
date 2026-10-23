@@ -1,14 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useConversations, useMessages } from "@/hooks/useConversations";
 import CreatorLayout from "@/Components/Creater/CreatorLayout";
 
-export default function CreatorMessagesPage() {
+function CreatorMessages() {
   const { conversations, loading, refetch } = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
   const { messages, send } = useMessages(activeId);
   const [draft, setDraft] = useState("");
+  const searchParams = useSearchParams();
+
+  // Deep-link support: /creator/messages?campaignId=... selects the
+  // conversation for that campaign once conversations have loaded, so a
+  // "new message" notification can open the right thread instead of
+  // landing on an empty picker. Mirrors the brand side's same support.
+  useEffect(() => {
+    if (activeId || loading || conversations.length === 0) return;
+    const campaignId = searchParams.get("campaignId");
+    if (!campaignId) return;
+    const match = conversations.find((c) => c.campaign?._id === campaignId);
+    if (match) setActiveId(match._id);
+  }, [activeId, loading, conversations, searchParams]);
 
   const active = conversations.find((c) => c._id === activeId);
 
@@ -79,5 +93,13 @@ export default function CreatorMessagesPage() {
       </div>
       </div>
     </CreatorLayout>
+  );
+}
+
+export default function CreatorMessagesPage() {
+  return (
+    <Suspense fallback={<div className="max-w-6xl mx-auto text-sm text-slate-400">Loading...</div>}>
+      <CreatorMessages />
+    </Suspense>
   );
 }

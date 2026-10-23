@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { BellIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useNotifications } from '@/hooks/useNotifications';
 import { type Notification } from '@/lib/notificationService';
@@ -9,6 +10,7 @@ interface NotificationDropdownProps {
 }
 
 export default function NotificationDropdown({ className = '' }: NotificationDropdownProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const {
     notifications,
@@ -70,6 +72,16 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
       await refreshNotifications();
     } catch (error) {
       console.error('Error refreshing notifications:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.isRead) {
+      handleMarkAsRead(notification._id);
+    }
+    if (notification.link) {
+      setIsOpen(false);
+      router.push(notification.link);
     }
   };
 
@@ -151,9 +163,10 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
                 {notifications.map(notification => (
                   <div
                     key={notification._id}
+                    onClick={() => handleNotificationClick(notification)}
                     className={`p-4 hover:bg-gray-50 transition-colors ${
                       !notification.isRead ? 'bg-blue-50' : ''
-                    }`}
+                    } ${notification.link ? 'cursor-pointer' : ''}`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 mt-1">
@@ -173,7 +186,7 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
                           <div className="flex items-center gap-1">
                             {!notification.isRead && (
                               <button
-                                onClick={() => handleMarkAsRead(notification._id)}
+                                onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notification._id); }}
                                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
                                 title="Mark as read"
                               >
@@ -181,7 +194,7 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
                               </button>
                             )}
                             <button
-                              onClick={() => handleDelete(notification._id)}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(notification._id); }}
                               className="p-2 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
                               title="Delete"
                             >

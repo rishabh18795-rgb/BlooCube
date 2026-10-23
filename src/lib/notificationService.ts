@@ -8,6 +8,7 @@ export interface Notification {
   type: 'campaign_created' | 'bid_received' | 'bid_accepted' | 'bid_rejected' | 'campaign_deadline' | 'payment_received' | 'analytics_update' | 'ai_suggestion' | 'system_alert' | 'user_activity';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   isRead: boolean;
+  link?: string;
   readAt?: string;
   createdAt: string;
   updatedAt: string;

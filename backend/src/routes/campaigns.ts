@@ -214,7 +214,7 @@ router.post('/:campaignId/bids/:bidId/accept', requireAuth, requireRole('BRAND')
     update: { applicationId: bidId },
   });
 
-  await NotificationService.send(application.creator.userId, 'APPLICATION_ACCEPTED', 'Application accepted!', `Your application for "${campaign.title}" was accepted. Funds are now held in escrow.`);
+  await NotificationService.send(application.creator.userId, 'APPLICATION_ACCEPTED', 'Application accepted!', `Your application for "${campaign.title}" was accepted. Funds are now held in escrow.`, '/creator/bids');
 
   const updated = await prisma.campaignApplication.findUniqueOrThrow({ where: { id: bidId }, include: { campaign: true, creator: { include: { user: true } } } });
   return ok(res, { bid: applicationToBidJson(updated) });
@@ -230,7 +230,7 @@ router.post('/:campaignId/bids/:bidId/reject', requireAuth, requireRole('BRAND')
   if (!application || application.campaignId !== campaignId) return fail(res, 'Application not found', 404);
 
   const updated = await prisma.campaignApplication.update({ where: { id: bidId }, data: { status: 'REJECTED' }, include: { campaign: true, creator: { include: { user: true } } } });
-  await NotificationService.send(application.creator.userId, 'APPLICATION_REJECTED', 'Application update', `Your application for "${campaign.title}" was not selected this time.`);
+  await NotificationService.send(application.creator.userId, 'APPLICATION_REJECTED', 'Application update', `Your application for "${campaign.title}" was not selected this time.`, '/creator/bids');
   return ok(res, { bid: applicationToBidJson(updated) });
 });
 

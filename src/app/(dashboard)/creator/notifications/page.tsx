@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Bell, 
   Check, 
@@ -20,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { CheckIcon } from 'lucide-react';
 import { ChevronDownIcon } from 'lucide-react';
 export default function CreatorNotificationsPage() {
+  const router = useRouter();
   const { user, isLoading } = useAuth();
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -303,9 +305,13 @@ export default function CreatorNotificationsPage() {
           {!loading && !error && filteredNotifications.map((notification) => (
             <div
               key={notification._id}
+              onClick={() => {
+                if (!notification.isRead) markAsRead(notification._id);
+                if (notification.link) router.push(notification.link);
+              }}
               className={`bg-white/80 backdrop-blur-sm rounded-sm p-6 border border-gray-200/50 hover:shadow-sm  transition-all duration-200 ${
                 !notification.isRead ? 'ring-2 ring-blue-100 bg-blue-50/30' : ''
-              }`}
+              } ${notification.link ? 'cursor-pointer' : ''}`}
             >
               <div className="flex items-start space-x-4">
                 {/* Type Icon */}
@@ -348,16 +354,16 @@ export default function CreatorNotificationsPage() {
                     <div className="flex items-center space-x-2 w-full sm:w-auto sm:justify-end">
                       {!notification.isRead && (
                         <button
-                          onClick={() => markAsRead(notification._id)}
+                          onClick={(e) => { e.stopPropagation(); markAsRead(notification._id); }}
                           className="px-3 py-1 text-sm text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors duration-200 flex items-center space-x-1 w-full sm:w-auto justify-center"
                         >
                           <Check className="w-4 h-4" />
                           <span>Mark read</span>
                         </button>
                       )}
-                      
+
                       <button
-                        onClick={() => deleteNotification(notification._id)}
+                        onClick={(e) => { e.stopPropagation(); deleteNotification(notification._id); }}
                         className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200 flex items-center space-x-1 w-full sm:w-auto justify-center"
                       >
                         <Trash2 className="w-4 h-4" />

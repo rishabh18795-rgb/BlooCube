@@ -456,35 +456,15 @@ export default function BrandSettingsPage() {
           </div>
           Billing Information
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="p-6 bg-white rounded-sm hover:shadow-sm border border-gray-200/04 transition-all duration-200">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-blue-100 rounded-sm">
-                <CreditCardIcon className="w-6 h-6 text-blue-600" />
-              </div>
-              <h4 className="font-semibold text-gray-900 text-lg">Current Plan</h4>
-            </div>
-            <p className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">Pro Plan</p>
-            <p className="text-md text-gray-600">₹2,999/month</p>
+        <div className="p-10 bg-white rounded-sm border border-gray-200/40 text-center">
+          <div className="inline-flex p-4 bg-gray-100 rounded-full mb-4">
+            <CreditCardIcon className="w-8 h-8 text-gray-400" />
           </div>
-            <div className="p-6 bg-white rounded-sm hover:shadow-sm border border-gray-200/04 transition-all duration-200">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-green-100 rounded-sm">
-                <CreditCardIcon className="w-6 h-6 text-green-600" />
-              </div>
-              <h4 className="font-semibold text-gray-900 text-lg">Next Billing</h4>
-            </div>
-            <p className="text-xl font-bold text-gray-900 mb-2">Dec 15, 2024</p>
-            <p className="text-md text-gray-600">Auto-renewal enabled</p>
-          </div>
-        </div>
-        <div className="mt-8 flex flex-col sm:flex-row gap-4">
-          <button className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-sm hover: bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105">
-            Update Payment Method
-          </button>
-          <button className="flex-1 px-6 py-3 border border-gray-200/04 text-gray-700 rounded-sm hover:bg-gray-50  transition-all duration-200 font-medium">
-            Download Invoice
-          </button>
+          <h4 className="font-semibold text-gray-900 text-lg mb-2">Billing — Coming Soon</h4>
+          <p className="text-sm text-gray-600 max-w-md mx-auto">
+            BlooCube does not yet have a paid plan, payment method, or invoicing. There is nothing billed
+            on your account today. This section will become available once a real billing system launches.
+          </p>
         </div>
       </div>
     </div>
