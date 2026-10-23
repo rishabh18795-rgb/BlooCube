@@ -317,22 +317,31 @@ withdrawal (via `/office-admin/*`) remains blocked on the Railway deploy, same a
 - [x] Mobile-responsive layouts on all audited public + admin pages
 - [x] Deliverable submission → escrow release → wallet credit → withdrawal request, live-verified end to
       end this pass (§17a), including the double-release guard holding under a real API call
+- [x] Office Admin portal backend route — **deployed and live 2026-10-24** (§12/§19); full positive-path
+      login with real admin credentials and the authenticated dashboard screens not yet re-walked
+- [x] Profile picture upload (creator + brand) — fixed and live-verified in production 2026-10-24 (§19)
+- [x] Profile "Save Changes" (phone/address/bio/website/notification preferences, both roles) — fixed and
+      live-verified in production 2026-10-24 (§19, §20)
+- [x] Self-service account deletion (creator + brand) — fixed and live-verified in production 2026-10-24
+      (§19); brand settings' Delete Account button previously had no handler at all
+- [x] Brand settings "Change Password" — fixed 2026-10-24 (§21); previously had no handler or input fields
+- [x] Session/token revocation on account deactivation or deletion — fixed and live-verified in production
+      2026-10-24 (§21); previously an already-issued token stayed usable for up to 15 minutes after deletion
+- [x] Avatar upload content validation (magic bytes, not just declared Content-Type) — fixed and
+      live-verified in production 2026-10-24 (§21); previously a spoofed file with an image header but
+      arbitrary content was accepted and stored
 
 **Explicitly NOT ready for real launch — do not represent these as live to users:**
 - [ ] Payment provider — confirmed mock only (`mock_...` provider refs), no real Razorpay/Stripe/etc.
       integration exists; the escrow/release/wallet/withdrawal *mechanics* above are real and correct, but
       move no real money
+- [ ] Billing tab (brand settings) — "Pro Plan"/renewal date are hardcoded mock data; "Update Payment
+      Method"/"Download Invoice" buttons have no handler and aren't labeled "Coming Soon" (§21) — flagged,
+      not fixed this pass
 - [ ] Password-reset email delivery — code complete, `RESEND_API_KEY`/`EMAIL_FROM` not configured
 - [ ] OTP/email verification on signup — intentionally disabled (`requiresOTP: false`), no provider configured
 - [ ] Creator subscription/membership tier — schema exists, zero purchase flow built anywhere
 - [ ] Instagram auto-posting — UI honestly labeled "Coming Soon", not implemented
-- [x] Office Admin portal backend route — **deployed and live 2026-10-24** (§12/§19); full positive-path
-      login with real admin credentials and the authenticated dashboard screens not yet re-walked
-- [x] Profile picture upload (creator + brand) — fixed and live-verified in production 2026-10-24 (§19)
-- [x] Profile "Save Changes" (phone/address/bio/website/notification preferences, both roles) — fixed and
-      live-verified in production 2026-10-24 (§19)
-- [x] Self-service account deletion (creator + brand) — fixed and live-verified in production 2026-10-24
-      (§19); brand settings' Delete Account button previously had no handler at all
 
 **Must happen before considering this "launched":**
 1. ~~Resolve the Railway outage and deploy the pending backend commits~~ — **Done 2026-10-24** (§12):
@@ -431,6 +440,70 @@ though login is now correctly blocked and the account should be gone. This is a 
 tradeoff for stateless JWTs (no DB lookup needed on every request), but it does mean "delete account" does
 not mean "immediately logged out everywhere" — worth a product decision on whether that's acceptable for
 launch, not something fixed silently as part of this pass.
+
+## 21. Session Revocation, File-Upload Spoofing Fix, Brand Password Fix (2026-10-24, third pass)
+
+Re-reconciled the environment fresh rather than trusting the prior pass's reported state: `main` was
+confirmed at `0392578` (matching `origin/main`, clean tree), Railway confirmed at deployment `c517d6d2`
+(commit `2e1dd1e`, unchanged since §19 — correctly not redeployed for the frontend-only §20 cache fix),
+Vercel's CLI was authenticated this pass (unlike earlier sessions) and confirmed `bloocube.com` aliased to
+a fresh, `-git-main-` tagged production deployment — the GitHub auto-deploy question from §11 is now
+settled by direct evidence, not inference. Prisma migrations confirmed up to date (4 migrations).
+
+**Security finding 1 — session revocation (explicitly requested this pass).** Reviewed the auth
+architecture first, per instruction: `requireAuth` verified only the JWT's own signature and expiry, never
+the account's current `isActive`/`deletedAt` state. Reproduced live against production *before* fixing:
+registered a QA account, captured its cookie, deleted the account, then reused the identical cookie against
+`GET /api/profile/me` — it returned **200** with the (now `isActive: false`) user's full profile, proving a
+deleted/deactivated account's token stayed fully usable. Fixed by adding one indexed primary-key `User`
+lookup inside `requireAuth` (`backend/src/middleware/auth.ts`), rejecting with 401 the instant an account is
+inactive or soft-deleted, regardless of remaining token TTL — this covers both self-deletion and an admin
+suspending someone, since both ultimately flip the same fields. 5 new tests (deactivation, soft-delete,
+reactivation, nonexistent-user token, active-account baseline). **Re-verified live in production after
+deploying**: the exact same pre-fix cookie, which had worked, now returns 401; a fresh active session still
+works normally (no regression).
+
+**Security finding 2 — avatar upload accepted spoofed file content.** While adding JPG/GIF test coverage
+(previously only PNG was tested), found that `multer`'s `fileFilter` only ever checked the client-declared
+`Content-Type` of the multipart field, never the actual bytes. Reproduced live on a local dev server: a
+request with `Content-Type: image/png` containing raw HTML was accepted, written to disk with a `.png`
+extension, and served back with a `Content-Type: image/png` response header derived from that extension —
+not the real content. Fixed by switching avatar upload to memory storage and sniffing real JPEG/PNG/GIF
+magic bytes before anything is ever written to disk (`backend/src/services/avatarStorage.ts`); the sniffed
+type, not the client's header, now decides both acceptance and the stored extension. 3 new tests (valid JPG,
+valid GIF, the exact spoofing case). **Re-verified live in production after deploying**: the identical
+spoofed request now returns 415; a genuine PNG upload still succeeds.
+
+Both fixes deployed together to Railway (new deployment `94a2e3e2`, migrations still up to date, `/health`
+200). One deploy attempt reported "Deploy failed" despite the build fully succeeding and the container's own
+logs showing a clean startup — looked like a transient platform-side issue (Railway's post-incident
+infrastructure has been flaky all engagement) rather than a code problem, so one considered retry was made
+(not a blind repeat) and it succeeded. A brief `502` appeared on `/health` during the container cutover
+itself and cleared on its own.
+
+**Bug 3 — brand settings "Change Password" had no handler or input fields at all.** Found during a static
+scan for buttons missing `onClick`. Unlike the earlier-fixed "Delete Account" button (which just needed
+wiring to an existing modal), this one had no password fields rendered at all — a brand account had no way
+to change its password through the UI. The backend route (`PUT /api/profile/change-password`) already
+existed and was already working for creator settings. Added the matching current/new password inputs and
+wired the button to the same `profileApi.changePassword()` call. **Verified end-to-end locally** (frontend-
+only change): old password rejected after the change, new password accepted.
+
+**Other static-scan findings, not fixed this pass** (flagged, not actioned): the Billing tab's "Update
+Payment Method" and "Download Invoice" buttons have no handlers either, but they sit under hardcoded mock
+billing data ("Pro Plan ₹2,999/month", a fixed fake renewal date) that was never wired to anything real —
+these are part of the not-yet-implemented commercial billing/payments feature (§8/§18), not a regression of
+something that used to work, and are not labeled "Coming Soon" in the UI, which is arguably misleading on
+its own. A full button/form inventory across every remaining page (the master prompt's Phase 3 in full) was
+not completed this pass — this was a targeted static scan of dashboard pages, not exhaustive.
+
+**Scope not completed this pass, stated explicitly rather than assumed**: full notification event-by-event
+testing (Phase 4), complete brand/creator end-to-end workflow re-walk (Phase 5 — last fully done in §17 on
+2026-10-22, not repeated this pass), admin/office-admin positive-path testing with real credentials (Phase
+6 — office-login route confirmed live in §12/§19, dashboard screens not click-tested), the full responsive
+matrix at every listed breakpoint (Phase 9 — only ad hoc checks done in §19/§20), and a broader dependency/
+CVE audit beyond the two file-upload and auth findings above (Phase 7). None of these were found to be
+broken; they simply were not actively re-tested this pass.
 
 ---
 
