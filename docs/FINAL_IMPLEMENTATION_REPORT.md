@@ -165,70 +165,42 @@ dashboard (Settings → Git) rather than asserting it outright. If confirmed, fu
 
 ## 12. Railway Deployment Status
 
-**Still blocked, reconfirmed a fifth time 2026-10-22 (new session) — never assumed stale across any pass.**
-Pending commits span `9181da9` through `5102c67` (office-login route, admin rejected on `/login`,
-suspend-reason field, the separate office-admin portal) — no backend code changes were needed this pass;
-the route already exists in source and is already registered (`backend/src/index.ts:37` →
-`app.use('/api/auth', authRoutes)`, with `office-login` defined at `backend/src/routes/auth.ts:140`). This
-is purely a deployment-availability gap, not a code defect.
+**RESOLVED 2026-10-24 — first successful deploy of this engagement.** Railway's incident (disclosed as a
+security event, not just capacity) recovered in stages by plan tier; this project's tier caught up
+sometime between the fifth recheck (2026-10-22, still rejecting `railway up`) and this session
+(2026-10-24), where `railway up --ci` actually built and shipped instead of being instantly rejected.
+New deployment id **`c517d6d2-bd51-451a-9508-e5c21b8ac502`**, built from commit `2e1dd1e` (which includes
+everything through the office-admin split, `9181da9`→`5102c67`, plus this session's avatar/profile-save
+fixes — see §19). `railway logs` showed `Deploy complete`, exit code 0.
 
-**What changed since the last check**: Railway's incident is now explicitly disclosed as a **security
-incident**, not just a capacity outage — they mass-rotated storage-bucket credentials and recommend
-customers rotate their own externally-held secrets (Postgres/Mongo/MySQL/Redis credentials, API keys).
-This project uses SQLite via a persistent Volume, not a Railway-managed database or bucket, so the
-database-credential-rotation guidance does not apply here; no project secrets are known to have been
-exposed by this incident specifically. Builds are being restored **in stages by plan tier**: as of
-2026-10-22 13:16 UTC the status page reports builds available again for **Pro and Enterprise** workspaces,
-with Hobby/Free/Trial still pending.
+Live-verified immediately after:
+- `/health` → `200 {"success":true,"status":"ok"}`.
+- `railway ssh -- npx prisma migrate status` (read-only): "Database schema is up to date!" — the new
+  `user_contact_notification_fields` migration (see §19) auto-applied cleanly, no manual migration step
+  needed.
+- `POST /api/auth/office-login` with bad credentials → **`401 "Invalid email or password"`** (previously
+  `404 "No route..."` every prior check this engagement) — the office-admin backend route is live.
+- `POST /api/auth/login` with `admin@bloocube.local` + a wrong password → `401` (generic message, by
+  design — see §15's note on why this can't distinguish "wrong password" from "blocked because admin"
+  without the real current password, which this session does not hold).
+- Unrelated pre-existing endpoints spot-checked for regressions: `GET /api/campaigns`, `GET
+  /api/profile/creators` (public, 200), `GET /api/admin/overview` (still correctly 401 unauthenticated).
 
-Reconfirmed this pass via: (1) Railway's status page, read fresh (not cached) — confirms the staged,
-tier-gated recovery above; (2) one direct `railway up --ci` attempt from `backend/` — still returned
-`"Deploys have been paused due to an upstream issue"`, the same response as every prior check. **The status
-page's partial-recovery language does not mean this project can deploy** — the live attempt is the
-authoritative signal, and it says no. Stopped there, as instructed — no repeated attempts this pass. The
-currently-live backend deployment (`d371185a`, from commit `ff15926`) remains healthy (`/health` → 200,
-confirmed fresh) — nothing has regressed, the new office-admin backend route simply isn't reachable yet.
+**Not re-verified this pass**: the office-admin door's full positive-path login (would need the current
+admin password, which is intentionally not held anywhere retrievable) and the office-admin dashboard's
+authenticated data screens. These were blocked on this exact deploy for the entire engagement, so the
+route now being live removes the blocker — but someone with the real admin credentials still needs to
+click through `/office-admin/login` once to close this out completely.
 
-**Local + remote verification re-run fresh this pass:**
-- Backend type-check clean, backend build clean, **21/21** backend tests pass (fresh run, not cached).
-- Production migration status checked directly via `railway ssh -- npx prisma migrate status` (read-only):
-  "Database schema is up to date!" — all 3 migrations already applied, confirming a deploy right now would
-  need **no migration step**, only the new application code.
-- Confirmed live, unauthenticated: `POST /api/auth/office-login` → `404 "No route..."` (deployed backend
-  predates `9181da9`, as expected); `POST /api/auth/login` → `401` (route alive, server healthy);
-  `GET /api/admin/overview` and `GET /api/admin/audit-logs` without a session → both `401 "Authentication
-  required"` (privileged endpoints correctly reject unauthenticated requests on the currently-deployed
-  code).
-- Confirmed via direct, read-only production DB query: a dedicated `ADMIN`-role account already exists
-  (`admin@bloocube.local`, active, verified, created 2026-10-08, password last rotated 2026-10-22) — no new
-  account needed to be provisioned; it is simply unreachable via `/office-login` until the backend deploy
-  lands.
+### If Railway ever regresses again
 
-### Deployment checklist for when Railway recovers
-
-1. Confirm recovery independently before attempting: check `https://status.railway.com` for builds
-   restored **for this project's specific plan tier** (recovery is staged — Enterprise, then Pro, then
-   Hobby, then Free/Trial — so "builds restored" for one tier does not mean restored for all) **and** that
-   `railway whoami` still authenticates (tokens have been mass-invalidated during this incident more than
-   once — a fresh `railway login` may be needed first). Even then, treat one real `railway up` attempt as
-   the authoritative signal over the status page's wording — it has shown partial-recovery language while
-   still actually rejecting deploys.
-2. From `backend/`, confirm the working tree is still clean and `git log -1` shows `5102c67` (or later)
-   before deploying, so the deployed image matches exactly what's been reviewed.
-3. `npx tsc --noEmit`, `npm run build`, `npm test` (expect 21/21) — re-run immediately before deploying,
-   not relying on this session's cached results.
-4. `npx @railway/cli up --ci` from `backend/`. Confirm `SUCCESS` in `railway deployment list`, then
-   `curl .../health` → `{"success":true,"status":"ok"}`.
-5. Tail startup logs (`railway logs --deployment`) for the Prisma migration step — expect
-   "No pending migrations to apply" (no new migration shipped since `20261017082809_password_reset_token`,
-   already applied). A different message here means investigate before declaring success.
-6. Live-verify `POST /api/auth/office-login`: a wrong-password attempt against a non-admin test email
-   should return a generic 401 (does not require a real account); a direct `curl` to
-   `/api/auth/login` with the **current rotated** admin credentials should also return 401 (confirms the
-   public-login admin block deployed correctly) — use a value only the owner knows, never typed into this
-   session again.
-7. Once confirmed, update this report's status tables to "Complete, deployed" with the new deployment ID
-   — do not mark office-admin functionality verified from code review alone.
+1. Confirm independently via `https://status.railway.com` for this project's specific plan tier, **and**
+   treat one real `railway up --ci` attempt as more authoritative than the status page's wording (it has
+   shown recovery language while still rejecting deploys, earlier in this incident).
+2. Confirm a clean tree and fresh `tsc --noEmit` / `npm run build` / `npm test` immediately before
+   deploying, not relying on a cached pass from an earlier session.
+3. After deploying, re-run the four checks above (`/health`, migrate status, office-login, admin-login)
+   before declaring it recovered — don't assume a successful `railway up` alone proves the app works.
 
 ## 13. Post-Deployment Smoke Tests
 
@@ -354,18 +326,71 @@ withdrawal (via `/office-admin/*`) remains blocked on the Railway deploy, same a
 - [ ] OTP/email verification on signup — intentionally disabled (`requiresOTP: false`), no provider configured
 - [ ] Creator subscription/membership tier — schema exists, zero purchase flow built anywhere
 - [ ] Instagram auto-posting — UI honestly labeled "Coming Soon", not implemented
-- [ ] Office Admin portal — code complete and frontend deployed, backend blocked on the Railway outage
+- [x] Office Admin portal backend route — **deployed and live 2026-10-24** (§12/§19); full positive-path
+      login with real admin credentials and the authenticated dashboard screens not yet re-walked
+- [x] Profile picture upload (creator + brand) — fixed and live-verified in production 2026-10-24 (§19)
+- [x] Profile "Save Changes" (phone/address/bio/website/notification preferences, both roles) — fixed and
+      live-verified in production 2026-10-24 (§19)
+- [x] Self-service account deletion (creator + brand) — fixed and live-verified in production 2026-10-24
+      (§19); brand settings' Delete Account button previously had no handler at all
 
 **Must happen before considering this "launched":**
-1. Resolve the Railway outage and deploy the pending backend commits (checklist in §12)
+1. ~~Resolve the Railway outage and deploy the pending backend commits~~ — **Done 2026-10-24** (§12):
+   deployment `c517d6d2` live and health-checked. Remaining: walk the office-admin dashboard once with
+   real admin credentials to close out full positive-path verification.
 2. Decide whether to pursue real payment-provider integration, or launch deliberately payment-mock (e.g. for a pilot/demo), and communicate that choice to users honestly
 3. Configure Resend if email-based password reset is required at launch
-4. ~~Run the collaboration-completion and payment-release flows at least once~~ — **Done 2026-10-22** (§17a): deliverable submission, release, wallet credit, and withdrawal request all live-verified. Still outstanding: an admin actually completing/failing a withdrawal, and the office-admin UI side of all this (blocked on §12)
-5. Rotate or delete the QA test accounts before any real users are onboarded
+4. ~~Run the collaboration-completion and payment-release flows at least once~~ — **Done 2026-10-22** (§17a): deliverable submission, release, wallet credit, and withdrawal request all live-verified. Still outstanding: an admin actually completing/failing a withdrawal, and walking the office-admin UI for all of this now that its backend is live
+5. Rotate or delete the QA test accounts before any real users are onboarded (the fresh one created for this pass's verification, `qa-verify-bugfix-creator@bloocube.com`, was already self-deleted as part of testing — see §19)
+
+## 19. Avatar Upload & Profile Save Bugfix, First Successful Railway Deploy (2026-10-24)
+
+Two bugs were reported by real users, reproduced live against production before any fix, then fixed and
+re-verified live in production after deploying (not inferred from code review):
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| `POST /api/profile/avatar` → `404 "No route..."` | The route never existed in the backend at all — not a deploy-lag issue like earlier office-login, a genuine gap | Added `POST`/`DELETE /api/profile/avatar` (multer, 5MB limit, JPG/PNG/GIF only, server-side-validated) storing files next to the SQLite DB on the same persistent Railway Volume (no new paid storage service); added a matching Next.js `/uploads/:path*` rewrite — without it, images would have 404'd on the *frontend* even with the backend route fixed, since only `/api/*` was proxied before |
+| Profile "Save Changes" never persisted | Frontend calls `PUT /api/profile/me`; backend only ever registered `PUT /api/profile/account` | Backend now accepts both paths; also added `User.phone`/`address`/notification-preference columns (additive migration) since those UI-editable fields had nowhere to persist to at all before |
+| (found during this audit) Brand settings "Delete Account" button did nothing — no `onClick` handler | Dead UI wiring, unrelated to the backend | Wired to the same confirm-password-then-delete flow creator settings already used; also discovered and fixed that `DELETE /api/profile/account` itself 404'd (soft-delete via the existing unused `isActive`/`deletedAt` fields, already enforced by `/login`) |
+
+**Testing performed:**
+- Reproduced both original bugs live against production with `curl` before writing any fix (exact
+  `"No route for POST /api/profile/avatar"` / `"No route for PUT /api/profile/me"` messages).
+- 10 new route-level (supertest, not just service-layer) tests: upload success, oversized/wrong-type
+  rejection, unauthenticated rejection, IDOR check (one user's request can't touch another's avatar or
+  role), profile update persistence for both roles, delete-account wrong/right password, soft-delete
+  blocking a subsequent login. Full suite: **31/31 pass**.
+- Live-verified end-to-end in a real browser against a local dev server + dev DB (not just curl): logged
+  in as a creator and a brand, uploaded an avatar through the actual file-picker-triggering button,
+  confirmed it rendered and survived a full page reload; typed into Phone/Website/Bio fields, clicked the
+  real "Save Changes" button, reloaded, confirmed persistence. Checked both pages at mobile width (375px)
+  — no overflow, buttons stack correctly.
+- After the Railway deploy succeeded (§12), re-ran the same checks directly against **production**: created
+  one freshly-labeled QA account (`qa-verify-bugfix-creator@bloocube.com`), uploaded an avatar (confirmed
+  servable both directly from the Railway backend and through the `bloocube.com` rewrite), updated
+  phone/bio/preferences and confirmed persistence on refetch, then exercised delete-account (wrong password
+  rejected, correct password soft-deleted, subsequent login correctly rejected as deactivated) — then the
+  account was gone, no cleanup needed.
+- Confirmed via code inspection (not newly built) that the creator-notification system required by this
+  audit already exists and is already wired: new bid → brand notified, bid accepted/rejected → creator
+  notified, new message → recipient notified, content submitted → brand notified
+  (`backend/src/services/notificationService.ts`, called from `bids.ts`/`campaigns.ts`/`messages.ts`/
+  `collaborations.ts`/`payments.ts`/`admin.ts`). Not re-tested live this pass; flagging as pre-existing and
+  already covered by earlier E2E testing in this engagement (§17), not something this pass needed to build.
+
+**Not covered this pass** (scope was the two reported bugs plus directly-adjacent findings, not the full
+12-section audit the request described): a full mobile pass across every other page, a dedicated security
+pentest beyond reviewing the new routes themselves, re-testing every pre-existing workflow beyond the spot
+checks in §12, and the office-admin dashboard's authenticated screens (route is live, UI not re-walked with
+real credentials).
 
 ---
 
-**Portal entry points**: `https://bloocube.com/login` (brand/creator, and — temporarily, until the next
-deploy — existing admin) · `https://bloocube.com/admin` (existing admin dashboard) ·
-`https://bloocube.com/office-admin/login` (new dedicated office portal — frontend live, backend pending
-the Railway outage).
+**Portal entry points**: `https://bloocube.com/login` (brand/creator) ·
+`https://bloocube.com/admin` (existing admin dashboard) ·
+`https://bloocube.com/office-admin/login` (dedicated office portal — backend now live as of 2026-10-24,
+§12). The deployed code (commit `2e1dd1e`) includes `9181da9`'s change blocking admin accounts from the
+public `/login` door, but this was only confirmed with a wrong-password request (generic 401, by design —
+see §12); it has not been independently re-confirmed with the real admin password that this door now
+actually rejects a *correct* admin password too.
