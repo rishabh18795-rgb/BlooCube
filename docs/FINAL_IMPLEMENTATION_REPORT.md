@@ -610,6 +610,53 @@ request — only desktop-width testing was done), and a from-scratch audit of ev
 feature listed in Phase 5 (campaign creation/editing, messaging, bid accept/reject) — none of those were
 touched by this change and were already covered in earlier sections (§17 and others).
 
+## 24. Commit Reconciliation, Mobile Testing, Regression Tests, Adjacency Checks (2026-10-24, sixth pass)
+
+**Commit reconciliation**: `b92e854` (§23's code fix) and `56d027e` (§23's doc-only follow-up) both confirmed
+on `origin/main`, with `56d027e` a direct descendant containing `b92e854`'s code unchanged. Vercel rebuilds
+on every push regardless of which files changed (no path-based ignore configured), so the `56d027e` push
+did trigger a fresh deployment — confirmed via `vercel inspect` (fresh `-git-main-` aliased build) and, more
+conclusively, by **re-running the exact deep-link reproduction against that specific deployment** with a new
+QA account: it opened the correct campaign, proving the live code is what §23 described, not just that the
+git history says so.
+
+**Mobile/responsive testing (Phase 6)**: tested the bid drawer and its confirmation dialog at all six
+requested widths — **320, 375, 390, 768, 1024, 1440px** — against production. At every width, confirmed
+`document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and took a visual
+screenshot. At 320px specifically (highest risk, smallest target) ran the complete flow: typed a proposal,
+set an amount, submitted, confirmed, and verified via a direct API check that exactly one bid was created.
+**No layout or usability issues found — no code changes were needed for responsiveness.**
+
+**Automated regression tests added**:
+- Backend (`backend/src/routes/__tests__/bids.test.ts`, new): bid creation, duplicate-application
+  rejection (409 — the exact protection the drawer's confirm/cancel flow depends on), a proposal under 10
+  characters, a zero/negative bid amount, an expired deadline, a non-`ACTIVE` campaign, and unauthenticated
+  access. **48/48 backend tests pass.** Along the way, found and fixed a latent bug in three existing test
+  files (`auth.test.ts`, `profile.test.ts`, this new one, before the fix): they signed test JWTs with a
+  lowercased role (`'creator'`), which only matches `requireAuth()`'s check, not `requireRole()`'s check
+  against the raw Prisma enum (`'CREATOR'`) the real `/login` route actually issues — every new bids test
+  initially failed with a false `403` until this was corrected; the earlier test files happened to only
+  exercise `requireAuth()`-only routes, so the same mismatch never surfaced there until now.
+- Frontend: **this project had no test runner of any kind before this.** Added a minimal, standard Vitest +
+  React Testing Library setup (`vitest.config.ts`, `vitest.setup.ts`, `npm test`) and 10 tests that render
+  the real marketplace page component with its data hooks mocked (nothing asserted against internals),
+  covering: deep-link opens the right campaign (from the loaded list, and via the direct-fetch fallback),
+  shows an error for an unfindable campaign, does not reopen itself after closing, "Submit Bid" shows the
+  confirmation dialog without calling the API, "Yes, Submit" calls it exactly once with the correct payload,
+  "Cancel" calls it zero times and returns to the editable drawer with the typed text intact, and a failed
+  submission shows the real error rather than a false success message. **10/10 pass.** Introduces 7 new
+  dev-only dependencies (`vitest`, `@testing-library/*`, `jsdom`, `@vitejs/plugin-react`); deliberately
+  pinned to `vitest@2.1.9` rather than the current major (`5.x`) because that version conflicts with this
+  project's existing `vite` peer dependency — `vitest@2.1.9`'s `tinypool` sub-dependency has a known
+  prototype-pollution advisory, assessed as low real-world risk here since it requires attacker-controlled
+  worker options, never exposed to untrusted input when just running this project's own trusted test files;
+  flagged here rather than silently ignored.
+
+**Adjacent workflow checks (Phase 5)**, all live against production with a fresh QA brand/creator pair,
+confirming this pass's changes caused no regressions: campaign creation, bid submission, the new-bid
+notification (correct `link`), bid acceptance, the acceptance notification (correct `link`), messaging in
+both directions, and bid rejection — all verified working, evidence in the test transcript for this pass.
+
 ---
 
 **Portal entry points**: `https://bloocube.com/login` (brand/creator) ·
