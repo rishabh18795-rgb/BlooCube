@@ -28,7 +28,7 @@ before(async () => {
     },
   });
   userId = user.id;
-  cookie = `access_token=${signAccessToken({ sub: user.id, role: 'creator' })}`;
+  cookie = `access_token=${signAccessToken({ sub: user.id, role: 'CREATOR' })}`;
 });
 
 test('a valid token for an active account is accepted (baseline, must not regress)', async () => {
@@ -67,7 +67,7 @@ test('reactivating the account makes the same token work again (confirms the che
 });
 
 test('a token for a user id that no longer exists is rejected, not treated as authenticated', async () => {
-  const ghostCookie = `access_token=${signAccessToken({ sub: 'nonexistent-user-id', role: 'creator' })}`;
+  const ghostCookie = `access_token=${signAccessToken({ sub: 'nonexistent-user-id', role: 'CREATOR' })}`;
   const res = await request(app).get('/api/profile/me').set('Cookie', ghostCookie);
   assert.equal(res.status, 401);
 });

@@ -42,7 +42,7 @@ before(async () => {
     },
   });
   creatorUserId = creator.id;
-  creatorCookie = authCookie(creator.id, 'creator');
+  creatorCookie = authCookie(creator.id, 'CREATOR');
 
   const brand = await prisma.user.create({
     data: {
@@ -54,7 +54,7 @@ before(async () => {
     },
   });
   brandUserId = brand.id;
-  brandCookie = authCookie(brand.id, 'brand');
+  brandCookie = authCookie(brand.id, 'BRAND');
 });
 
 test('PUT /api/profile/me persists phone, address, and preferences (previously 404)', async () => {
@@ -251,7 +251,7 @@ test('DELETE /api/profile/account requires the correct password and soft-deletes
   const user = await prisma.user.create({
     data: { email: `delete-test-${Date.now()}@example.com`, passwordHash, name: 'Delete Me', role: 'CREATOR' },
   });
-  const cookie = authCookie(user.id, 'creator');
+  const cookie = authCookie(user.id, 'CREATOR');
 
   const wrongPassword = await request(app).delete('/api/profile/account').set('Cookie', cookie).send({ password: 'wrong' });
   assert.equal(wrongPassword.status, 401);
