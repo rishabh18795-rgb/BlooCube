@@ -505,6 +505,55 @@ matrix at every listed breakpoint (Phase 9 — only ad hoc checks done in §19/�
 CVE audit beyond the two file-upload and auth findings above (Phase 7). None of these were found to be
 broken; they simply were not actively re-tested this pass.
 
+## 22. Notification-Link Feature Deployed and Verified Live (2026-10-24, fourth pass)
+
+§21's work was committed and pushed but explicitly **not yet deployed** to Railway. This pass deployed it,
+ran the full pre-deploy checklist first, and verified every notification type live in production with real
+HTTP evidence — not code inspection.
+
+**Pre-deploy**: fresh `npm ci` on both frontend and backend from the committed lockfiles; `tsc --noEmit` and
+production builds clean on both; **41/41** backend tests pass. `npm audit` found 5 high-severity issues on
+the backend (`body-parser`, plus pre-existing `deepmerge-ts`/`prisma` CLI-chain and `zod` findings) and 3 on
+the frontend (`brace-expansion`, plus a **critical** pre-existing Next.js RCE in its Image Optimization API
+requiring a major-version bump). Applied only the two safe, non-breaking fixes (`body-parser`→1.20.9,
+`brace-expansion`) via `npm audit fix` — lockfile-only changes, no `package.json` edits, committed separately
+(`7e7098c`). The Next.js critical RCE and the Prisma/zod chain are **not fixed** — both need major-version
+upgrades, are pre-existing (not introduced by this work), and are flagged here as a standalone item needing
+its own dedicated pass, not bundled into this deploy.
+
+**Migration safety reviewed**: the only schema change is `ALTER TABLE "Notification" ADD COLUMN "link"
+TEXT;` — additive, nullable, no data loss risk. Confirmed via `railway ssh -- npx prisma migrate status`
+both before (4 migrations, up to date) and after (5 migrations, up to date) the deploy.
+
+**Notification link safety reviewed**: every `link` value is either a hardcoded route literal
+(`/brand/bids`, `/creator/bids`, `/brand/collaborations`, `/creator/payments`) or built from an internal
+`campaignId` (a cuid from our own DB, never user-supplied text) — no injection or open-redirect vector.
+Confirmed a link cannot be used to reach another user's private conversation: the frontend only matches the
+`campaignId` against the authenticated user's *own* `GET /api/conversations` list (already scoped
+server-side to `creatorUserId`/`brandUserId` = the caller); an unrelated account directly requesting a
+conversation's messages by ID got a live-verified `403 Forbidden`.
+
+**Deployed**: Railway deployment `f09222f9` (from commit `7e7098c`), `/health` → 200. Vercel auto-deployed
+the same commit to `https://bloocube.com`, confirmed via a fresh (non-cached) page fetch.
+
+**Verified live in production**, using three fresh, disposable QA accounts (all self-deleted afterward via
+the delete-account route, per standing practice — no data left behind):
+- New-bid notification → brand gets it with `link: "/brand/bids"`; clicked in a real browser, URL changed
+  to `/brand/bids`, correct bid data rendered.
+- Bid-accepted notification → creator gets it with `link: "/creator/bids"` (API-verified).
+- New-message notification, **both directions** → `link` correctly scoped per recipient role
+  (`/brand/messages?campaignId=X` and `/creator/messages?campaignId=X`), confirmed via direct API response.
+- Mark-as-read → unread count dropped from 2 to 1 as expected.
+- Cross-account conversation access → correctly rejected with 403.
+- Billing tab → live-rendered "Billing — Coming Soon" on `https://bloocube.com`, no fake plan data.
+- Regression sweep on the same production backend: avatar upload (200), profile save (200), session
+  revocation (stale token → 401 after delete), upload-spoofing guard (415) — all still correct, confirming
+  this deploy didn't disturb §19–§21's fixes.
+
+**Not tested this pass**: the full admin/office-admin dashboard walkthrough with real credentials (still
+blocked — not holding the current admin password), and a dedicated fix for the critical Next.js RCE noted
+above.
+
 ---
 
 **Portal entry points**: `https://bloocube.com/login` (brand/creator) ·
