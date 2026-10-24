@@ -1,6 +1,7 @@
 "use client";
-import { useMemo, useState, useEffect } from 'react';
-import { useCampaigns } from '@/hooks/useCampaigns';
+import { Suspense, useMemo, useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useCampaigns, getCampaign } from '@/hooks/useCampaigns';
 import { useBids, createBidApi } from '@/hooks/useBids';
 import type { Campaign } from '@/types/campaign';
 import { cookieAuthUtils } from '@/lib/cookieAuth';
@@ -16,7 +17,8 @@ import {
   SelectValue,
 } from "@/Components/ui/Select";
 import { ChevronDownIcon } from 'lucide-react';
-export default function CreatorMarketplacePage() {
+function CreatorMarketplace() {
+  const searchParams = useSearchParams();
   const { data: campaigns, loading, error, params, setParams, refetch } = useCampaigns({ status: 'active', limit: 10 });
   const { data: bids, loading: bidsLoading, refetch: refetchBids } = useBids({});
   const [placing, setPlacing] = useState<string | null>(null);
@@ -117,6 +119,54 @@ const [activeFilters, setActiveFilters] = useState<string[]>([]);
       refetchBids();
     }
   }, [isCreator, refetchBids]);
+
+  // Deep-link support: /creator/marketplace?campaign=... (optionally
+  // &apply=1) opens that campaign's bid drawer directly, instead of
+  // silently dropping the parameter and landing on the generic list.
+  // Every existing "Apply Now" / "Place Bid" link elsewhere in the app
+  // (the public campaigns page, the creator dashboard's recommendations,
+  // and bid-related notifications) points here with this exact param -
+  // none of them worked before this, since it was never read at all.
+  //
+  // deepLinkAttempted is a ref, not state: this effect's dependencies
+  // (campaigns, loading) churn several times in quick succession right
+  // after mount (the debounced search filter alone triggers a second
+  // fetch), and each change tears down the previous effect invocation's
+  // closure before its in-flight getCampaign() promise resolves. A
+  // `cancelled` flag scoped to one invocation (the usual pattern for this)
+  // ends up true by the time *any* invocation's promise settles, so
+  // nothing ever opens. A ref persists across all of those re-invocations
+  // on the same mount, so it correctly guards "attempt this exactly once"
+  // without being torn down by unrelated dependency changes.
+  const deepLinkAttempted = useRef(false);
+  useEffect(() => {
+    if (loading || selectedCampaign || deepLinkAttempted.current) return;
+    const campaignId = searchParams.get('campaign');
+    if (!campaignId) return;
+    deepLinkAttempted.current = true;
+
+    const openCampaign = (c: Campaign) => {
+      setSelectedCampaign(c);
+      setDrawerOpen(true);
+    };
+
+    const inLoadedList = campaigns.find((c) => c._id === campaignId);
+    if (inLoadedList) {
+      openCampaign(inLoadedList);
+      return;
+    }
+
+    // Not in the first page of active campaigns (e.g. a different status,
+    // or beyond the default page size) - fetch it directly by id rather
+    // than silently failing to find it.
+    getCampaign(campaignId)
+      .then((c) => {
+        if (c) openCampaign(c);
+      })
+      .catch(() => {
+        setMessage({ type: 'error', text: 'That campaign could not be found. It may have been removed or closed.' });
+      });
+  }, [loading, campaigns, searchParams, selectedCampaign]);
 
   // Debug: Log bids data when it changes
   useEffect(() => {
@@ -750,9 +800,13 @@ const platformOptions = [
             className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-sm hover:opacity-90 disabled:opacity-50"
             disabled={!isCreator || placing === selectedCampaign._id || !proposal || !amount}
            onClick={() => {
-    placeBid();
-             closeDrawer();
-    setShowConfirmation(true);         // ✅ drawer close
+    // Only ask for confirmation here - placeBid() fires solely from the
+    // confirmation dialog's "Yes, Submit" button below. It used to also
+    // fire from this click, submitting the bid for real before the user
+    // ever saw the "Are you sure?" dialog - so "Cancel" on that dialog
+    // never actually canceled anything.
+    setDrawerOpen(false);
+    setShowConfirmation(true);
   }}
           >
             {placing === selectedCampaign._id ? "Submitting..." : "Submit Bid"}
@@ -780,7 +834,7 @@ const platformOptions = [
       {/* Close Button */}
       <button
         className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-lg"
-        onClick={() => setShowConfirmation(false)}
+        onClick={() => { setShowConfirmation(false); setDrawerOpen(true); }}
       >
         <X/>
       </button>
@@ -803,7 +857,7 @@ const platformOptions = [
 
         <button
           className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-sm hover:bg-gray-300"
-          onClick={() => setShowConfirmation(false)}
+          onClick={() => { setShowConfirmation(false); setDrawerOpen(true); }}
         >
           Cancel
         </button>
@@ -815,6 +869,14 @@ const platformOptions = [
 
 
     </CreatorLayout>
+  );
+}
+
+export default function CreatorMarketplacePage() {
+  return (
+    <Suspense fallback={null}>
+      <CreatorMarketplace />
+    </Suspense>
   );
 }
 
