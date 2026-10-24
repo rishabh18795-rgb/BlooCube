@@ -554,6 +554,62 @@ the delete-account route, per standing practice — no data left behind):
 blocked — not holding the current admin password), and a dedicated fix for the critical Next.js RCE noted
 above.
 
+## 23. Campaign Detail / Place Bid Deep-Link and Confirmation Fixes (2026-10-24, fifth pass)
+
+Investigated before touching any code, per instruction. There is no dedicated campaign-detail route or
+page anywhere in the app — "View Details" / "Apply Now" / "Place Bid" everywhere (the public `/campaigns`
+landing page, the creator dashboard's recommended-campaigns cards, and this exact URL shape) all link to
+`/creator/marketplace?campaign=<id>` (optionally `&apply=1`), which opens a single combined detail+bid
+drawer on the marketplace list page. Confirmed via `grep` that **three separate places** link this way and
+**zero** `searchParams` usage existed on the receiving page — the parameter was silently dropped everywhere.
+
+**Root cause 1 — campaign detail/bid deep-link silently ignored.** Clicking any of those links landed on
+the generic campaign list instead of opening the intended campaign. Fixed by adding an effect that reads
+`?campaign=`, checks the already-loaded campaign list first, and falls back to a direct `GET
+/api/campaigns/:id` (pre-existing endpoint, already used elsewhere via `getCampaign()`) for a campaign
+outside the default page size — with a clear "could not be found" message if it genuinely doesn't exist.
+
+The first version of this fix introduced its own regression, caught during testing rather than assumed
+fixed: a `cancelled`-flag-per-effect-invocation pattern (the usual one for this kind of async-in-effect
+code) was being torn down by this component's own unrelated dependency churn (`campaigns`/`loading` change
+several times in the first second after mount) *before* the shared, deduped `getCampaign()` promise ever
+resolved — live-traced via console logging to confirm, not guessed. Replaced with a `useRef`-based
+one-shot guard, which persists correctly across that churn. Also fixed a second regression from the first
+fix: the deep-link query string is never cleared, and `selectedCampaign` legitimately returns to `null`
+every time the drawer closes — without a persistent "already attempted" guard, the drawer was reopening
+itself immediately after every close, including right after a successful submission.
+
+**Root cause 2 — bid submitted before the user confirmed.** The drawer's "Submit Bid" button called the
+real `placeBid()` API submission **immediately**, then closed the drawer and opened a "Are you sure you
+want to submit this bid?" dialog *afterward*. Clicking "Cancel" on that dialog never canceled anything —
+the bid had already been sent. Fixed so only the confirmation dialog's "Yes, Submit" button fires the
+actual submission; "Cancel" and the dialog's × button now correctly return to the editable drawer instead
+of silently discarding a bid that was already placed.
+
+**Testing — local, then production, both with direct API verification, not just UI observation:**
+- Deep link opens the correct campaign (screenshot evidence, both locally and on `bloocube.com`).
+- Closing the drawer (via Cancel) does not reopen it — confirmed with a 3-second wait and a DOM check.
+- Clicking "Submit Bid" creates **zero** bids until "Yes, Submit" is clicked (verified via a direct
+  `GET /api/bids` check with the confirmation dialog still open, both locally and in production).
+- Clicking "Yes, Submit" creates **exactly one** bid with the correct amount — confirmed via `GET
+  /api/bids` immediately after, both locally (2 sequential submissions, no duplicates) and in production.
+- Brand-side visibility: the submitted bid is visible via `GET /api/campaigns/:id/bids` with the correct
+  amount, status, and creator identity.
+- Duplicate submission to the same campaign correctly rejected with `409`.
+- A creator calling the brand-only accept endpoint correctly rejected with `403`.
+- An invalid/nonexistent campaign id shows the intended error message (confirmed on a fresh page load,
+  not missed due to its 5-second auto-dismiss).
+
+This is a **frontend-only** change (`src/app/(dashboard)/creator/marketplace/page.tsx`) — no backend routes
+or schema were touched, since the backend's bid-creation and single-campaign-fetch endpoints were already
+correct. Deployed via Vercel auto-deploy from commit `b92e854`; confirmed via a fresh (non-cached) page
+fetch before running the production tests above.
+
+**Not covered this pass**: the full responsive-breakpoint sweep of the drawer/modal (Phase 6 of this
+request — only desktop-width testing was done), and a from-scratch audit of every OTHER marketplace-related
+feature listed in Phase 5 (campaign creation/editing, messaging, bid accept/reject) — none of those were
+touched by this change and were already covered in earlier sections (§17 and others).
+
 ---
 
 **Portal entry points**: `https://bloocube.com/login` (brand/creator) ·
